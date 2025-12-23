@@ -22,6 +22,13 @@ const jiraApi = axios.create({
   }
 });
 
+const formatTime = (date: Date) =>
+  date.toLocaleTimeString('es-GT', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
 // Get all projects
 app.get('/api/projects', async (_req, res) => {
   try {
@@ -69,6 +76,7 @@ app.get('/api/issues', async (req, res) => {
 // Get single issue with all details
 app.get('/api/issues/:issueKey', async (req, res) => {
   try {
+    const weekOffset = Number(req.query.weekOffset || 0);
     const response = await jiraApi.get(`/issue/${req.params.issueKey}`, {
       params: {
         fields: [
@@ -112,27 +120,49 @@ app.put('/api/issues/:issueKey', async (req, res) => {
   }
 });
 
+const toDateKey = (date: Date) =>
+  date.toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+
 // Get worklogs grouped by day for weekly timesheet
 app.get('/api/worklogs/daily', async (req, res) => {
   try {
+    const weekOffset = Number(req.query.weekOffset || 0);
     // Get current user
     const userResponse = await jiraApi.get('/myself');
     const accountId = userResponse.data.accountId;
 
     // Calculate current week (Monday to Sunday)
+    // const now = new Date();
+    // const startDate = new Date();
+    // const currentDay = now.getDay();
+    // const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    // startDate.setDate(now.getDate() - daysToMonday);
+    // startDate.setHours(0, 0, 0, 0);
+
+    // const endDate = new Date();
+    // const daysToSunday = currentDay === 0 ? 0 : 7 - currentDay;
+    // endDate.setDate(now.getDate() + daysToSunday);
+    // endDate.setHours(23, 59, 59, 999);
+
+    // const startDateStr = startDate.toISOString().split('T')[0];
+
+    // Calculate week (Monday to Sunday) with offset (LOCAL TIME)
     const now = new Date();
-    const startDate = new Date();
-    const currentDay = now.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    startDate.setDate(now.getDate() - daysToMonday);
+    now.setDate(now.getDate() + weekOffset * 7);
+    now.setHours(12, 0, 0, 0); // evita bug UTC
+
+    const currentDay = now.getDay(); // 0 = domingo
+    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+
+    const startDate = new Date(now);
+    startDate.setDate(now.getDate() + diffToMonday);
     startDate.setHours(0, 0, 0, 0);
 
-    const endDate = new Date();
-    const daysToSunday = currentDay === 0 ? 0 : 7 - currentDay;
-    endDate.setDate(now.getDate() + daysToSunday);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
     endDate.setHours(23, 59, 59, 999);
 
-    const startDateStr = startDate.toISOString().split('T')[0];
+    const startDateStr = toDateKey(startDate);
 
     // Search for issues where user logged work this week
     const jql = `worklogAuthor = currentUser() AND worklogDate >= "${startDateStr}" ORDER BY updated DESC`;
@@ -151,7 +181,8 @@ app.get('/api/worklogs/daily', async (req, res) => {
     for (let i = 0; i < 7; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
+      // const dateStr = date.toISOString().split('T')[0];
+      const dateStr = toDateKey(date);
       const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
       const dayName = dayNames[date.getDay()];
 
@@ -175,15 +206,23 @@ app.get('/api/worklogs/daily', async (req, res) => {
           if (worklog.author.accountId === accountId) {
             const worklogDate = new Date(worklog.started);
             if (worklogDate >= startDate && worklogDate <= endDate) {
-              const dateStr = worklogDate.toISOString().split('T')[0];
+              // const dateStr = worklogDate.toISOString().split('T')[0];
+              const dateStr = toDateKey(worklogDate);
 
               if (dailyTotals[dateStr]) {
                 dailyTotals[dateStr].totalSeconds += worklog.timeSpentSeconds;
+                const startTime = new Date(worklog.started);
+                const endTime = new Date(
+                  startTime.getTime() + worklog.timeSpentSeconds * 1000
+                );
+
                 dailyTotals[dateStr].worklogs.push({
                   issueKey: issue.key,
                   summary: issue.fields.summary,
                   timeSpentSeconds: worklog.timeSpentSeconds,
-                  started: worklog.started
+                  started: worklog.started,
+                  from: formatTime(startTime),
+                  to: formatTime(endTime)
                 });
                 totalSeconds += worklog.timeSpentSeconds;
               }
@@ -195,6 +234,12 @@ app.get('/api/worklogs/daily', async (req, res) => {
       }
     }
 
+    Object.values(dailyTotals).forEach(day => {
+      day.worklogs.sort((a, b) => {
+        return new Date(b.started).getTime() - new Date(a.started).getTime();
+      });
+    });
+
     // Convert to array and calculate hours
     const dailyData = Object.values(dailyTotals).map(day => ({
       ...day,
@@ -204,8 +249,10 @@ app.get('/api/worklogs/daily', async (req, res) => {
     }));
 
     res.json({
-      weekStart: startDate.toISOString().split('T')[0],
-      weekEnd: endDate.toISOString().split('T')[0],
+      // weekStart: startDate.toISOString().split('T')[0],
+      // weekEnd: endDate.toISOString().split('T')[0],
+      weekStart: toDateKey(startDate),
+      weekEnd: toDateKey(endDate),
       dailyData,
       totalSeconds,
       totalHours: Math.round((totalSeconds / 3600) * 100) / 100,
@@ -258,7 +305,8 @@ app.get('/api/worklogs', async (req, res) => {
       endDate.setHours(23, 59, 59, 999);
     }
 
-    const startDateStr = startDate.toISOString().split('T')[0];
+    // const startDateStr = startDate.toISOString().split('T')[0];
+    const startDateStr = toDateKey(startDate);
 
     // Search for issues where user logged work
     const jql = `worklogAuthor = currentUser() AND worklogDate >= "${startDateStr}" ORDER BY updated DESC`;

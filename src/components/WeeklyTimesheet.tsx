@@ -12,6 +12,8 @@ interface DailyData {
     summary: string
     timeSpentSeconds: number
     started: string
+    from: string
+    to: string
   }[]
 }
 
@@ -31,14 +33,21 @@ function formatHours(seconds: number): string {
   return `${hours}h ${minutes}m`
 }
 
+// function formatDate(dateStr: string): string {
+//   const date = new Date(dateStr)
+//   const day = date.getDate()
+//   const month = date.getMonth() + 1
+//   return `${day}/${month}`
+// }
+
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const day = date.getDate()
-  const month = date.getMonth() + 1
-  return `${day}/${month}`
+  const [year, month, day] = dateStr.split('-')
+  return `${day}/${Number(month)}`
 }
 
+
 export default function WeeklyTimesheet() {
+  const [weekOffset, setWeekOffset] = useState(0);
   const [data, setData] = useState<TimesheetData | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
@@ -46,7 +55,7 @@ export default function WeeklyTimesheet() {
   const fetchTimesheet = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/worklogs/daily')
+      const res = await fetch(`/api/worklogs/daily?weekOffset=${weekOffset}`)
       const result = await res.json()
       setData(result)
     } catch (err) {
@@ -56,9 +65,13 @@ export default function WeeklyTimesheet() {
     }
   }
 
+  // useEffect(() => {
+  //   fetchTimesheet()
+  // }, [])
+
   useEffect(() => {
-    fetchTimesheet()
-  }, [])
+  fetchTimesheet()
+}, [weekOffset])
 
   const getProgressColor = (progress: number): string => {
     if (progress >= 100) return 'success'
@@ -66,14 +79,19 @@ export default function WeeklyTimesheet() {
     return 'danger'
   }
 
+  const todayKey = (): string =>
+  new Date().toLocaleDateString('sv-SE')
+
   const isToday = (dateStr: string): boolean => {
-    const today = new Date().toISOString().split('T')[0]
-    return dateStr === today
+    // const today = new Date().toISOString().split('T')[0]
+    // return dateStr === today
+    return dateStr === todayKey()
   }
 
   const isPastDay = (dateStr: string): boolean => {
-    const today = new Date().toISOString().split('T')[0]
-    return dateStr < today
+    // const today = new Date().toISOString().split('T')[0]
+    // return dateStr < today
+    return dateStr < todayKey()
   }
 
   return (
@@ -84,6 +102,60 @@ export default function WeeklyTimesheet() {
         <button aria-label="Resize" className="resize"></button>
       </div>
       <div className="separator"></div>
+
+      {/* <div className="week-navigation">
+        <button onClick={() => setWeekOffset(w => w - 1)}>⬅️</button>
+
+        {data && (
+          <span className="week-range">
+            {formatDate(data.weekStart)} – {formatDate(data.weekEnd)}
+          </span>
+        )}
+
+        <button
+          onClick={() => setWeekOffset(w => w + 1)}
+          disabled={weekOffset === 0}
+        >
+          ➡️
+        </button>
+      </div> */}
+
+      <div className="week-navigation">
+        <button
+          className="nav-btn"
+          onClick={() => setWeekOffset(w => w - 1)}
+          title="Semana anterior"
+        >
+          ⬅️
+        </button>
+
+        {data && (
+          <span className="week-range">
+            {formatDate(data.weekStart)} – {formatDate(data.weekEnd)}
+          </span>
+        )}
+
+        <button
+          className="nav-btn"
+          onClick={() => setWeekOffset(w => w + 1)}
+          disabled={weekOffset === 0}
+          title="Semana siguiente"
+        >
+          ➡️
+        </button>
+        {weekOffset !== 0 && (
+          <button
+            className="nav-btn"
+            onClick={() => setWeekOffset(0)}
+            disabled={weekOffset === 0}
+            title="Ir a la semana actual"
+          >
+            Hoy
+          </button>
+        )}
+      </div>
+
+
 
       <div className="window-pane timesheet-content">
         {loading ? (
@@ -167,15 +239,23 @@ export default function WeeklyTimesheet() {
                       <div className="day-worklogs">
                         {day.worklogs.map((log, idx) => (
                           <div key={idx} className="worklog-item">
-                            <a
-                              href={`https://tribal-mnc.atlassian.net/browse/${log.issueKey}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="worklog-issue"
-                            >
-                              {log.issueKey}
-                            </a>
-                            <span className="worklog-time">{formatHours(log.timeSpentSeconds)}</span>
+                            <div className="worklog-main">
+                              <a
+                                href={`https://tribal-mnc.atlassian.net/browse/${log.issueKey}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="worklog-issue"
+                              >
+                                {log.issueKey}
+                              </a>
+                              <span className="worklog-range">
+                                {log.from} – {log.to}
+                              </span>
+                            </div>
+
+                            <span className="worklog-time">
+                              {formatHours(log.timeSpentSeconds)}
+                            </span>
                           </div>
                         ))}
                       </div>
