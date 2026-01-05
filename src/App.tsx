@@ -3,6 +3,7 @@ import KanbanBoard from './components/KanbanBoard'
 import IssueDetailPanel from './components/IssueDetailPanel'
 import WorklogSummary from './components/WorklogSummary'
 import WeeklyTimesheet from './components/WeeklyTimesheet'
+import WeeklySummary from './components/WeeklySummary'
 import { JiraIssue, Project, IssueDetail } from './types'
 
 const PRESET_FILTERS = [
@@ -34,7 +35,8 @@ function App() {
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [projectSearch, setProjectSearch] = useState('')
   const [showWorklogSummary, setShowWorklogSummary] = useState(false)
-  const [showTimesheet, setShowTimesheet] = useState(false)
+  const [activeTimeView, setActiveTimeView] = useState<'none' | 'weekly' | 'summary' | 'history'>('none')
+  const [activeView, setActiveView] = useState<'kanban' | 'weekly' | 'history' | 'summary'>('kanban')
 
   useEffect(() => {
     fetchProjects()
@@ -172,38 +174,50 @@ function App() {
         <div className="separator"></div>
 
         <div className="window-pane">
-          <div className="toolbar">
-            <button className="btn" onClick={toggleTheme} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
-              {theme === 'light' ? '☾ Dark' : '☀ Light'}
-            </button>
-            <button className="btn" onClick={() => fetchIssues()} disabled={loading}>
-              {loading ? 'Loading...' : '↻ Refresh'}
-            </button>
-            <button
-              className="btn btn-default"
-              onClick={() => {
-                setShowTimesheet(!showTimesheet)
-                if (showWorklogSummary) setShowWorklogSummary(false)
-              }}
-            >
-              {showTimesheet ? '✕ Cerrar Control' : '📊 Control Semanal'}
-            </button>
-            <button
-              className="btn"
-              onClick={() => {
-                setShowWorklogSummary(!showWorklogSummary)
-                if (showTimesheet) setShowTimesheet(false)
-              }}
-            >
-              {showWorklogSummary ? '✕ Cerrar' : '⏱ Resumen'}
-            </button>
+          <div className="main-navigation">
+            <div className="nav-tabs">
+              <button
+                className={`nav-tab ${activeView === 'kanban' ? 'active' : ''}`}
+                onClick={() => setActiveView('kanban')}
+              >
+                Tablero Kanban
+              </button>
+              <button
+                className={`nav-tab ${activeView === 'weekly' ? 'active' : ''}`}
+                onClick={() => setActiveView('weekly')}
+              >
+                Semana Actual
+              </button>
+              <button
+                className={`nav-tab ${activeView === 'history' ? 'active' : ''}`}
+                onClick={() => setActiveView('history')}
+              >
+                Historial Semanal
+              </button>
+              <button
+                className={`nav-tab ${activeView === 'summary' ? 'active' : ''}`}
+                onClick={() => setActiveView('summary')}
+              >
+                Resumen General
+              </button>
+            </div>
+            <div className="nav-actions">
+              <button className="btn btn-icon" onClick={toggleTheme} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
+                {theme === 'light' ? 'Dark' : 'Light'}
+              </button>
+              {activeView === 'kanban' && (
+                <button className="btn" onClick={() => fetchIssues()} disabled={loading}>
+                  {loading ? 'Loading...' : 'Refresh'}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="separator"></div>
 
-          <div className="filters">
-            <div className="field-row">
-              <label>Project:</label>
-              <div className="project-selector">
+          {activeView === 'kanban' && (
+            <div className="filters">
+              <div className="field-row">
+                <label>Project:</label>
+                <div className="project-selector">
                 <button
                   className="btn project-selector-btn"
                   onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
@@ -294,40 +308,53 @@ function App() {
               </button>
             </div>
           </div>
+          )}
 
-          {error && (
+          {activeView === 'kanban' && error && (
             <div className="standard-dialog">
               <div className="dialog-text">{error}</div>
             </div>
           )}
 
-          <div className="separator"></div>
+          <main className={selectedIssue && activeView === 'kanban' ? 'with-panel' : ''}>
+            {activeView === 'kanban' && (
+              <>
+                <div className="content">
+                  <KanbanBoard
+                    issues={issues}
+                    loading={loading}
+                    onIssueClick={handleIssueClick}
+                    onStatusChange={() => fetchIssues()}
+                  />
+                </div>
 
-          <main className={selectedIssue || showWorklogSummary || showTimesheet ? 'with-panel' : ''}>
-            <div className="content">
-              <KanbanBoard
-                issues={issues}
-                loading={loading}
-                onIssueClick={handleIssueClick}
-                onStatusChange={() => fetchIssues()}
-              />
-            </div>
-
-            {showTimesheet && !selectedIssue && (
-              <WeeklyTimesheet />
+                {selectedIssue && (
+                  <IssueDetailPanel
+                    issue={selectedIssue}
+                    loading={detailLoading}
+                    onClose={handleCloseDetail}
+                    onUpdate={handleIssueUpdate}
+                  />
+                )}
+              </>
             )}
 
-            {showWorklogSummary && !selectedIssue && !showTimesheet && (
-              <WorklogSummary />
+            {activeView === 'weekly' && (
+              <div className="full-view">
+                <WeeklyTimesheet />
+              </div>
             )}
 
-            {selectedIssue && (
-              <IssueDetailPanel
-                issue={selectedIssue}
-                loading={detailLoading}
-                onClose={handleCloseDetail}
-                onUpdate={handleIssueUpdate}
-              />
+            {activeView === 'history' && (
+              <div className="full-view">
+                <WeeklySummary />
+              </div>
+            )}
+
+            {activeView === 'summary' && (
+              <div className="full-view">
+                <WorklogSummary />
+              </div>
             )}
           </main>
         </div>

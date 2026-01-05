@@ -1,5 +1,19 @@
 import { useState, useEffect } from 'react'
 
+interface Worklog {
+  issueKey: string
+  summary: string
+  timeSpentSeconds: number
+  started: string
+}
+
+interface WorklogWithConflict extends Worklog {
+  hasConflict: boolean
+  conflictsWith: number[]
+  startTime: Date
+  endTime: Date
+}
+
 interface DailyData {
   date: string
   dayName: string
@@ -7,12 +21,7 @@ interface DailyData {
   totalHours: number
   goalHours: number
   progress: number
-  worklogs: {
-    issueKey: string
-    summary: string
-    timeSpentSeconds: number
-    started: string
-  }[]
+  worklogs: Worklog[]
 }
 
 interface TimesheetData {
@@ -36,6 +45,50 @@ function formatDate(dateStr: string): string {
   const day = date.getDate()
   const month = date.getMonth() + 1
   return `${day}/${month}`
+}
+
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+function detectTimeConflicts(worklogs: Worklog[]): WorklogWithConflict[] {
+  const worklogsWithTimes: WorklogWithConflict[] = worklogs.map(log => {
+    const startTime = new Date(log.started)
+    const endTime = new Date(startTime.getTime() + log.timeSpentSeconds * 1000)
+    return {
+      ...log,
+      startTime,
+      endTime,
+      hasConflict: false,
+      conflictsWith: []
+    }
+  })
+
+  // Check for conflicts
+  for (let i = 0; i < worklogsWithTimes.length; i++) {
+    for (let j = i + 1; j < worklogsWithTimes.length; j++) {
+      const log1 = worklogsWithTimes[i]
+      const log2 = worklogsWithTimes[j]
+
+      // Check if times overlap
+      const hasOverlap = (
+        (log1.startTime < log2.endTime && log1.endTime > log2.startTime) ||
+        (log2.startTime < log1.endTime && log2.endTime > log1.startTime)
+      )
+
+      if (hasOverlap) {
+        log1.hasConflict = true
+        log2.hasConflict = true
+        log1.conflictsWith.push(j)
+        log2.conflictsWith.push(i)
+      }
+    }
+  }
+
+  return worklogsWithTimes
 }
 
 export default function WeeklyTimesheet() {
@@ -117,6 +170,8 @@ export default function WeeklyTimesheet() {
                 const today = isToday(day.date)
                 const past = isPastDay(day.date)
                 const hasWorklogs = day.worklogs.length > 0
+                const worklogsWithConflicts = hasWorklogs ? detectTimeConflicts(day.worklogs) : []
+                const hasAnyConflict = worklogsWithConflicts.some(w => w.hasConflict)
 
                 return (
                   <div
@@ -127,6 +182,7 @@ export default function WeeklyTimesheet() {
                       <div className="day-info">
                         <span className="day-name">{day.dayName}</span>
                         <span className="day-date">{formatDate(day.date)}</span>
+                        {hasAnyConflict && <span className="conflict-badge" title="Hay conflictos de horario">!</span>}
                       </div>
                       {today && <span className="today-badge">HOY</span>}
                     </div>
@@ -159,23 +215,29 @@ export default function WeeklyTimesheet() {
                         className="btn toggle-worklogs"
                         onClick={() => setExpandedDay(isExpanded ? null : day.date)}
                       >
-                        {isExpanded ? '▲' : '▼'} {day.worklogs.length} {day.worklogs.length === 1 ? 'registro' : 'registros'}
+                        {isExpanded ? '−' : '+'} {day.worklogs.length} {day.worklogs.length === 1 ? 'registro' : 'registros'}
                       </button>
                     )}
 
                     {isExpanded && hasWorklogs && (
                       <div className="day-worklogs">
-                        {day.worklogs.map((log, idx) => (
-                          <div key={idx} className="worklog-item">
+                        {worklogsWithConflicts
+                          .sort((a, b) => new Date(a.started).getTime() - new Date(b.started).getTime())
+                          .map((log, idx) => (
+                          <div key={idx} className={`worklog-item-compact ${log.hasConflict ? 'has-conflict' : ''}`}>
+                            <span className="conflict-icon-space"></span>
                             <a
                               href={`https://tribal-mnc.atlassian.net/browse/${log.issueKey}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="worklog-issue"
+                              className="worklog-issue-link"
                             >
                               {log.issueKey}
                             </a>
-                            <span className="worklog-time">{formatHours(log.timeSpentSeconds)}</span>
+                            <span className="worklog-timerange">
+                              {formatTime(log.started)} - {formatTime(log.endTime.toISOString())}
+                            </span>
+                            <span className="worklog-duration">{formatHours(log.timeSpentSeconds)}</span>
                           </div>
                         ))}
                       </div>

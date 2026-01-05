@@ -23,6 +23,20 @@ function formatHours(seconds: number): string {
   return `${hours}h ${minutes}m`
 }
 
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const dateFormatted = date.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+  const timeFormatted = date.toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  return `${dateFormatted} ${timeFormatted}`
+}
+
 export default function WorklogSummary() {
   const [period, setPeriod] = useState<'week' | 'month' | 'all'>('week')
   const [data, setData] = useState<WorklogData | null>(null)
@@ -125,8 +139,8 @@ export default function WorklogSummary() {
                         <div className="worklog-entries">
                           {item.worklogs.map((log) => (
                             <div key={log.id} className="worklog-entry">
-                              <span className="worklog-date">
-                                {new Date(log.started).toLocaleDateString('es-ES')}
+                              <span className="worklog-datetime">
+                                {formatDateTime(log.started)}
                               </span>
                               <span className="worklog-time">{formatHours(log.timeSpentSeconds)}</span>
                             </div>

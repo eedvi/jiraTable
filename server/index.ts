@@ -133,13 +133,14 @@ app.get('/api/worklogs/daily', async (req, res) => {
     endDate.setHours(23, 59, 59, 999);
 
     const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
 
     // Search for issues where user logged work this week
     const jql = `worklogAuthor = currentUser() AND worklogDate >= "${startDateStr}" ORDER BY updated DESC`;
     const issuesResponse = await jiraApi.get('/search/jql', {
       params: {
         jql,
-        fields: 'summary,worklog',
+        fields: 'summary,worklog,parent,duedate,issuetype',
         maxResults: 1000
       }
     });
@@ -164,12 +165,15 @@ app.get('/api/worklogs/daily', async (req, res) => {
     }
 
     let totalSeconds = 0;
+    const issuesToAdjust: string[] = [];
 
     // Process each issue's worklogs
     for (const issue of issuesResponse.data.issues || []) {
       try {
         const worklogResponse = await jiraApi.get(`/issue/${issue.key}/worklog`);
         const worklogs = worklogResponse.data.worklogs || [];
+        
+        let hasWorklogThisWeek = false;
 
         for (const worklog of worklogs) {
           if (worklog.author.accountId === accountId) {
@@ -186,7 +190,58 @@ app.get('/api/worklogs/daily', async (req, res) => {
                   started: worklog.started
                 });
                 totalSeconds += worklog.timeSpentSeconds;
+                hasWorklogThisWeek = true;
               }
+            }
+          }
+        }
+
+        // Validate and adjust due dates if issue has worklogs this week
+        if (hasWorklogThisWeek) {
+          const duedate = issue.fields.duedate;
+          const isSubtask = issue.fields.issuetype?.subtask === true;
+          
+          // Check if duedate is outside this week or null
+          const needsAdjustment = !duedate || duedate < startDateStr || duedate > endDateStr;
+          
+          if (needsAdjustment) {
+            try {
+              // Adjust to Friday of current week (or end of week)
+              const fridayDate = new Date(endDate);
+              fridayDate.setDate(endDate.getDate() - 2); // Friday is 2 days before Sunday
+              const adjustedDate = fridayDate.toISOString().split('T')[0];
+              
+              await jiraApi.put(`/issue/${issue.key}`, {
+                fields: { duedate: adjustedDate }
+              });
+              
+              issuesToAdjust.push(`${issue.key} (${isSubtask ? 'Subtarea' : 'Historia'})`);
+              console.log(`✓ Adjusted ${issue.key} duedate to ${adjustedDate}`);
+              
+              // If it's a subtask, also adjust parent story
+              if (isSubtask && issue.fields.parent) {
+                try {
+                  const parentKey = issue.fields.parent.key;
+                  const parentResponse = await jiraApi.get(`/issue/${parentKey}`, {
+                    params: { fields: 'duedate' }
+                  });
+                  
+                  const parentDuedate = parentResponse.data.fields.duedate;
+                  const parentNeedsAdjustment = !parentDuedate || parentDuedate < startDateStr || parentDuedate > endDateStr;
+                  
+                  if (parentNeedsAdjustment) {
+                    await jiraApi.put(`/issue/${parentKey}`, {
+                      fields: { duedate: adjustedDate }
+                    });
+                    issuesToAdjust.push(`${parentKey} (Historia padre)`);
+                    console.log(`✓ Adjusted parent ${parentKey} duedate to ${adjustedDate}`);
+                  }
+                } catch (parentErr) {
+                  console.error(`Error adjusting parent for ${issue.key}:`, parentErr);
+                }
+              }
+            } catch (adjustErr: any) {
+              console.error(`Error adjusting ${issue.key}:`, adjustErr.response?.data || adjustErr.message);
             }
           }
         }
@@ -210,7 +265,8 @@ app.get('/api/worklogs/daily', async (req, res) => {
       totalSeconds,
       totalHours: Math.round((totalSeconds / 3600) * 100) / 100,
       weeklyGoalHours: 40,
-      weeklyProgress: Math.round((totalSeconds / (40 * 3600)) * 100)
+      weeklyProgress: Math.round((totalSeconds / (40 * 3600)) * 100),
+      adjustedIssues: issuesToAdjust.length > 0 ? issuesToAdjust : undefined
     });
   } catch (error: any) {
     console.error('Error fetching daily worklogs:', error.response?.data || error.message);
@@ -325,6 +381,17 @@ app.get('/api/worklogs', async (req, res) => {
   } catch (error: any) {
     console.error('Error fetching worklogs:', error.response?.data || error.message);
     res.status(500).json({ error: 'Failed to fetch worklogs', details: error.response?.data });
+  }
+});
+
+// Get worklogs for a specific issue
+app.get('/api/issues/:issueKey/worklogs', async (req, res) => {
+  try {
+    const response = await jiraApi.get(`/issue/${req.params.issueKey}/worklog`);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error fetching issue worklogs:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch issue worklogs', details: error.response?.data });
   }
 });
 
@@ -655,6 +722,132 @@ app.post('/api/issues/:issueKey/subtasks', async (req, res) => {
       error: 'Failed to create subtask',
       details: error.response?.data
     });
+  }
+});
+
+// Get worklogs grouped by weeks (for weekly summary view)
+app.get('/api/worklogs/weeks', async (req, res) => {
+  try {
+    const { weeksBack = 12 } = req.query; // Default: last 12 weeks
+
+    // Get current user
+    const userResponse = await jiraApi.get('/myself');
+    const accountId = userResponse.data.accountId;
+
+    // Calculate date range (last N weeks)
+    const now = new Date();
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    const startDate = new Date();
+    startDate.setDate(now.getDate() - (Number(weeksBack) * 7));
+    startDate.setHours(0, 0, 0, 0);
+
+    const startDateStr = startDate.toISOString().split('T')[0];
+
+    // Search for issues where user logged work
+    const jql = `worklogAuthor = currentUser() AND worklogDate >= "${startDateStr}" ORDER BY updated DESC`;
+    const issuesResponse = await jiraApi.get('/search/jql', {
+      params: {
+        jql,
+        fields: 'summary,worklog',
+        maxResults: 1000
+      }
+    });
+
+    // Initialize weeks structure
+    const weeksData: { [key: string]: { 
+      weekStart: string, 
+      weekEnd: string, 
+      totalSeconds: number, 
+      totalHours: number,
+      dailyBreakdown: { [key: string]: number },
+      issuesBreakdown: { [key: string]: { summary: string, hours: number, seconds: number } }
+    } } = {};
+
+    // Process each issue's worklogs
+    for (const issue of issuesResponse.data.issues || []) {
+      try {
+        const worklogResponse = await jiraApi.get(`/issue/${issue.key}/worklog`);
+        const worklogs = worklogResponse.data.worklogs || [];
+
+        for (const worklog of worklogs) {
+          if (worklog.author.accountId === accountId) {
+            const worklogDate = new Date(worklog.started);
+            if (worklogDate >= startDate && worklogDate <= endDate) {
+              // Calculate week start (Sunday) and week end (Saturday)
+              const weekStart = new Date(worklogDate);
+              const dayOfWeek = worklogDate.getDay();
+              const daysToSunday = dayOfWeek === 0 ? 0 : dayOfWeek;
+              weekStart.setDate(worklogDate.getDate() - daysToSunday);
+              weekStart.setHours(0, 0, 0, 0);
+
+              const weekEnd = new Date(weekStart);
+              weekEnd.setDate(weekStart.getDate() + 6);
+              weekEnd.setHours(23, 59, 59, 999);
+
+              const weekKey = weekStart.toISOString().split('T')[0];
+              const dateStr = worklogDate.toISOString().split('T')[0];
+
+              if (!weeksData[weekKey]) {
+                weeksData[weekKey] = {
+                  weekStart: weekStart.toISOString().split('T')[0],
+                  weekEnd: weekEnd.toISOString().split('T')[0],
+                  totalSeconds: 0,
+                  totalHours: 0,
+                  dailyBreakdown: {},
+                  issuesBreakdown: {}
+                };
+              }
+
+              weeksData[weekKey].totalSeconds += worklog.timeSpentSeconds;
+              weeksData[weekKey].dailyBreakdown[dateStr] = (weeksData[weekKey].dailyBreakdown[dateStr] || 0) + worklog.timeSpentSeconds;
+              
+              // Add issue breakdown
+              if (!weeksData[weekKey].issuesBreakdown[issue.key]) {
+                weeksData[weekKey].issuesBreakdown[issue.key] = {
+                  summary: issue.fields.summary,
+                  hours: 0,
+                  seconds: 0
+                };
+              }
+              weeksData[weekKey].issuesBreakdown[issue.key].seconds += worklog.timeSpentSeconds;
+              weeksData[weekKey].issuesBreakdown[issue.key].hours = Math.round((weeksData[weekKey].issuesBreakdown[issue.key].seconds / 3600) * 100) / 100;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Error fetching worklogs for ${issue.key}:`, err);
+      }
+    }
+
+    // Convert to array, calculate hours, and sort by week start descending
+    const weeks = Object.values(weeksData)
+      .map(week => ({
+        ...week,
+        totalHours: Math.round((week.totalSeconds / 3600) * 100) / 100,
+        dailyBreakdown: Object.entries(week.dailyBreakdown).reduce((acc, [date, seconds]) => {
+          acc[date] = Math.round((seconds / 3600) * 100) / 100;
+          return acc;
+        }, {} as { [key: string]: number }),
+        issues: Object.entries(week.issuesBreakdown)
+          .map(([key, data]) => ({
+            issueKey: key,
+            summary: data.summary,
+            hours: data.hours
+          }))
+          .sort((a, b) => b.hours - a.hours)
+      }))
+      .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime());
+
+    res.json({
+      weeksBack: Number(weeksBack),
+      totalWeeks: weeks.length,
+      weeks
+    });
+  } catch (error: any) {
+    console.error('Error fetching weekly worklogs:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch weekly worklogs', details: error.response?.data });
   }
 });
 

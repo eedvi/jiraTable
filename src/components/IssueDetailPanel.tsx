@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { IssueDetail } from '../types'
 
 interface Props {
@@ -16,6 +16,20 @@ function formatTime(seconds: number | undefined): string {
     return `${hours}h ${minutes}m`
   }
   return `${minutes}m`
+}
+
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const dateFormatted = date.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+  const timeFormatted = date.toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  return `${dateFormatted} ${timeFormatted}`
 }
 
 function parseTimeToSeconds(timeStr: string): number | null {
@@ -52,6 +66,17 @@ function renderDescription(description: any): string {
   }
 }
 
+interface Worklog {
+  id: string
+  author: {
+    displayName: string
+    avatarUrls: { [key: string]: string }
+  }
+  timeSpentSeconds: number
+  started: string
+  comment?: any
+}
+
 export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: Props) {
   const [editing, setEditing] = useState<string | null>(null)
   const [timeSpent, setTimeSpent] = useState('')
@@ -60,8 +85,25 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
   const [newComment, setNewComment] = useState('')
   const [newSubtaskSummary, setNewSubtaskSummary] = useState('')
   const [saving, setSaving] = useState(false)
+  const [worklogs, setWorklogs] = useState<Worklog[]>([])
+  const [worklogsLoading, setWorklogsLoading] = useState(false)
 
   const { fields } = issue
+
+  const fetchWorklogs = async () => {
+    setWorklogsLoading(true)
+    try {
+      const res = await fetch(`/api/issues/${issue.key}/worklogs`)
+      const data = await res.json()
+      if (data.worklogs) {
+        setWorklogs(data.worklogs)
+      }
+    } catch (err) {
+      console.error('Failed to fetch worklogs:', err)
+    } finally {
+      setWorklogsLoading(false)
+    }
+  }
 
   const handleLogTime = async () => {
     if (!timeSpent.trim()) return
@@ -79,6 +121,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
       })
       setTimeSpent('')
       setEditing(null)
+      await fetchWorklogs()
       onUpdate()
     } catch (err) {
       console.error('Failed to log time:', err)
@@ -167,6 +210,11 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
       setSaving(false)
     }
   }
+
+  // Load worklogs on mount
+  useEffect(() => {
+    fetchWorklogs()
+  }, [issue.key])
 
   if (loading) {
     return (
@@ -313,6 +361,39 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
               <button className="btn add-btn" onClick={() => setEditing('logTime')}>+ Log Time</button>
             )}
           </div>
+        </div>
+
+        <div className="section">
+          <h3>Historial de Tiempos ({worklogs.length})</h3>
+          {worklogsLoading ? (
+            <div className="loading">Cargando worklogs...</div>
+          ) : worklogs.length > 0 ? (
+            <div className="worklogs-history">
+              {worklogs
+                .sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime())
+                .map((worklog) => (
+                  <div key={worklog.id} className="worklog-history-item">
+                    <div className="worklog-header-info">
+                      <img
+                        src={worklog.author.avatarUrls['24x24']}
+                        alt=""
+                        className="avatar"
+                      />
+                      <span className="worklog-author">{worklog.author.displayName}</span>
+                      <span className="worklog-datetime">{formatDateTime(worklog.started)}</span>
+                      <span className="worklog-duration">{formatTime(worklog.timeSpentSeconds)}</span>
+                    </div>
+                    {worklog.comment && (
+                      <div className="worklog-comment">
+                        {renderDescription(worklog.comment)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="no-worklogs">No hay tiempos registrados aún</div>
+          )}
         </div>
 
         <div className="section">
