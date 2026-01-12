@@ -24,6 +24,9 @@ Este comando requiere el MCP server de Atlassian. Para instalarlo:
 - Registrar tiempo (worklog)
 - Transicionar issues
 
+### Si el MCP no está instalado
+El comando fallará al intentar conectarse con Jira. Verás errores indicando que las herramientas `mcp__atlassian__*` no están disponibles. Sigue los pasos de instalación arriba para configurarlo.
+
 ---
 
 ## Modo Inteligente
