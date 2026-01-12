@@ -2,4 +2,6 @@ node_modules/
 dist/
 .env
 *.log
-.claude/
+
+# Claude Code - ignorar settings personales, compartir comandos
+.claude/settings.local.json
