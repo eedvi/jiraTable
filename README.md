@@ -2,7 +2,7 @@
 
 Dashboard de visualización de tickets de Jira con tablas de datos, tableros Kanban y hojas de tiempo semanales.
 
-## 📋 Descripción
+## Descripción
 
 Esta aplicación permite visualizar y gestionar tickets de Jira a través de diferentes vistas:
 - Tabla de datos interactiva
@@ -10,13 +10,13 @@ Esta aplicación permite visualizar y gestionar tickets de Jira a través de dif
 - Hoja de tiempo semanal
 - Resumen de registros de trabajo
 
-## 🚀 Requisitos Previos
+## Requisitos Previos
 
 - Node.js (versión 18 o superior)
 - npm o yarn
 - Cuenta de Jira con acceso a la API
 
-## 🔧 Instalación
+## Instalación
 
 1. Clona el repositorio:
 ```bash
@@ -43,7 +43,7 @@ Para obtener tu token de API de Jira:
 - Haz clic en "Crear token de API"
 - Copia el token generado
 
-## 🏃 Uso
+## Uso
 
 ### Modo Desarrollo
 
@@ -75,7 +75,7 @@ npm run build
 npm start
 ```
 
-## 🛠️ Tecnologías
+## Tecnologías
 
 - **Frontend**: React + TypeScript + Vite
 - **Backend**: Node.js + Express + TypeScript
@@ -83,7 +83,7 @@ npm start
 - **Estilos**: CSS personalizado + System.css
 - **API**: Jira REST API
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 jiraTable/
@@ -96,6 +96,6 @@ jiraTable/
 └── package.json       # Dependencias y scripts
 ```
 
-## 📝 Licencia
+## Licencia
 
 Este proyecto es de código abierto y está disponible bajo la licencia MIT.
