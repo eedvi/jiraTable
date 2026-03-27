@@ -17,11 +17,13 @@ Two stacked horizontal progress bars:
 - **Registrado** (green gradient) — total worklogs for the current week
 
 Color coding for estimated bar:
-- Green (≤80% of 40h): comfortable load
+- Green (<=80% of 40h): comfortable load
 - Orange (80-100%): near capacity
 - Red (>100%): overloaded
 
 Weekly goal: 40h (hardcoded).
+
+Error state: if `/api/capacity` fails, hide the banner silently (log to console). Do not show broken UI.
 
 ### Backend Endpoint
 
@@ -43,10 +45,12 @@ Response:
 
 Logic:
 1. Fetch current user via `/myself`
-2. Query: `assignee = currentUser() AND statusCategory != Done` with field `timeoriginalestimate`
+2. Query estimates: `assignee = currentUser() AND statusCategory != Done` with field `timeoriginalestimate` using `/search/jql` (consistent with existing endpoints)
 3. Sum `timeoriginalestimate` across all matching issues (Jira stores in seconds)
-4. For logged hours: calculate current week (Monday-Sunday), query `worklogAuthor = currentUser() AND worklogDate >= "{mondayDate}"`, sum worklog seconds for current user within the week
+4. Query logged hours: `worklogAuthor = currentUser() AND worklogDate >= "{mondayDate}"` using `/search/jql`, then fetch each issue's worklogs and sum seconds for current user within the week (reuses the same pattern as existing `/api/worklogs/daily`)
 5. Tickets with no estimate counted in `ticketCount` but contribute 0 to estimated hours
+
+Note: The logged hours calculation duplicates logic from `/api/worklogs/daily`. This is acceptable because `/api/capacity` is a lightweight endpoint called independently — merging the two would couple the capacity banner to the weekly timesheet view's heavier response. The N+1 worklog fetching pattern is inherited from the existing codebase; optimizing it is out of scope for this feature.
 
 ### Frontend Component
 
@@ -72,19 +76,27 @@ interface CapacityData {
 ### Behavior
 - **On view switch:** Refresh data for the target view
 - **Background poll:** Every 10 minutes, silently refresh the active view's data + capacity banner
-- **After actions:** Refresh after logging time, transitioning a ticket, adding a comment
-- **Deduplication:** Skip fetch if the same view was fetched < 30 seconds ago
+- **After actions:** Refresh after logging time, transitioning a ticket, adding a comment. Action-based refreshes bypass the deduplication threshold.
+- **Deduplication:** Skip fetch if the same view was fetched < 30 seconds ago. Only applies to view-switch and polling refreshes, NOT action-based refreshes.
 - **Silent updates:** No loading spinner on auto/background refresh — only on initial/manual fetch
 
 ### Implementation
 
 A `useAutoRefresh` custom hook in `App.tsx`:
-- Manages a 10-minute `setInterval`
+- Manages a 10-minute `setInterval` (with `clearInterval` cleanup on unmount)
 - Tracks `lastFetched` timestamp per view
 - Exposes a `refreshKey` (incrementing number) passed to child components
 - Child components re-fetch when `refreshKey` changes via `useEffect`
 
+Silent refresh mechanism: child components receive both `refreshKey` and a `silent` boolean. When `silent` is true, the component skips `setLoading(true)` so no spinner appears. Initial mount and manual refresh set `silent: false`; auto-refresh and polling set `silent: true`.
+
+Kanban view refresh: `App.tsx` already manages Kanban data via `fetchIssues()`. The auto-refresh hook calls `fetchIssues()` directly when the active view is Kanban — no `refreshKey` prop needed for `KanbanBoard`.
+
 The manual "Refresh" button remains as a force-refresh override.
+
+### Cleanup of dead state
+
+Remove unused state variables `activeTimeView` and `showWorklogSummary` from `App.tsx` as part of this work.
 
 ## Files Changed
 
@@ -93,8 +105,10 @@ The manual "Refresh" button remains as a force-refresh override.
 | `server/index.ts` | Add `GET /api/capacity` endpoint |
 | `src/components/CapacityBanner.tsx` | New — dual progress bar component |
 | `src/types.ts` | Add `CapacityData` interface |
-| `src/App.tsx` | Auto-refresh hook, capacity fetch, render banner, pass refreshKey |
+| `src/App.tsx` | Auto-refresh hook, capacity fetch, render banner, pass refreshKey + silent prop, remove dead state (`activeTimeView`, `showWorklogSummary`) |
 | `src/styles/modern.css` | Capacity banner styles |
-| `src/components/WeeklyTimesheet.tsx` | Accept `refreshKey` prop, re-fetch on change |
-| `src/components/WeeklySummary.tsx` | Accept `refreshKey` prop, re-fetch on change |
-| `src/components/WorklogSummary.tsx` | Accept `refreshKey` prop, re-fetch on change |
+| `src/components/KanbanBoard.tsx` | No prop changes — refreshed via `fetchIssues()` in App.tsx |
+| `src/components/IssueDetailPanel.tsx` | No prop changes — existing `onUpdate` callback already triggers refresh |
+| `src/components/WeeklyTimesheet.tsx` | Accept `refreshKey` and `silent` props, re-fetch on change |
+| `src/components/WeeklySummary.tsx` | Accept `refreshKey` and `silent` props, re-fetch on change |
+| `src/components/WorklogSummary.tsx` | Accept `refreshKey` and `silent` props, re-fetch on change |
