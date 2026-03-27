@@ -135,3 +135,14 @@ export interface IssueDetail {
     subtasks?: Subtask[]
   }
 }
+
+export interface CapacityData {
+  estimatedSeconds: number
+  estimatedHours: number
+  loggedSeconds: number
+  loggedHours: number
+  weeklyGoalHours: number
+  estimatedPercent: number
+  loggedPercent: number
+  ticketCount: number
+}
