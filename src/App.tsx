@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import KanbanBoard from './components/KanbanBoard'
 import IssueDetailPanel from './components/IssueDetailPanel'
 import WorklogSummary from './components/WorklogSummary'
 import WeeklyTimesheet from './components/WeeklyTimesheet'
 import WeeklySummary from './components/WeeklySummary'
-import { JiraIssue, Project, IssueDetail } from './types'
+import CapacityBanner from './components/CapacityBanner'
+import { JiraIssue, Project, IssueDetail, CapacityData } from './types'
 
 const PRESET_FILTERS = [
   { label: 'My Issues', jql: 'assignee = currentUser() ORDER BY updated DESC' },
@@ -34,9 +35,15 @@ function App() {
   })
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [projectSearch, setProjectSearch] = useState('')
-  const [showWorklogSummary, setShowWorklogSummary] = useState(false)
-  const [activeTimeView, setActiveTimeView] = useState<'none' | 'weekly' | 'summary' | 'history'>('none')
   const [activeView, setActiveView] = useState<'kanban' | 'weekly' | 'history' | 'summary'>('kanban')
+
+  // Capacity banner
+  const [capacityData, setCapacityData] = useState<CapacityData | null>(null)
+
+  // Auto-refresh
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [silentRefresh, setSilentRefresh] = useState(false)
+  const lastFetchedRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     fetchProjects()
@@ -123,6 +130,67 @@ function App() {
     }
   }
 
+  const fetchCapacity = useCallback(async () => {
+    try {
+      const res = await fetch('/api/capacity')
+      const data = await res.json()
+      if (!data.error) {
+        setCapacityData(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch capacity:', err)
+    }
+  }, [])
+
+  const fetchIssuesSilent = useCallback(async () => {
+    try {
+      let jql = customJql
+      if (selectedProject) {
+        jql = `project = "${selectedProject}" AND (${jql.replace(/ ORDER BY.*$/i, '')}) ORDER BY updated DESC`
+      }
+      const res = await fetch(`/api/issues?jql=${encodeURIComponent(jql)}&maxResults=100`)
+      const data = await res.json()
+      if (!data.error) {
+        setIssues(data.issues || [])
+      }
+    } catch (err) {
+      console.error('Silent issue refresh failed:', err)
+    }
+  }, [customJql, selectedProject])
+
+  // Auto-refresh on view switch (with 30s dedup)
+  useEffect(() => {
+    const last = lastFetchedRef.current[activeView] || 0
+    if (Date.now() - last > 30000) {
+      setSilentRefresh(true)
+      setRefreshKey(prev => prev + 1)
+      fetchCapacity()
+      // For kanban, silently refresh issues
+      if (activeView === 'kanban') {
+        fetchIssuesSilent()
+      }
+      lastFetchedRef.current = { ...lastFetchedRef.current, [activeView]: Date.now() }
+    }
+  }, [activeView, fetchCapacity, fetchIssuesSilent])
+
+  // Background polling every 10 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSilentRefresh(true)
+      setRefreshKey(prev => prev + 1)
+      fetchCapacity()
+      if (activeView === 'kanban') {
+        fetchIssuesSilent()
+      }
+    }, 10 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [activeView, fetchCapacity, fetchIssuesSilent])
+
+  // Fetch capacity on mount
+  useEffect(() => {
+    fetchCapacity()
+  }, [fetchCapacity])
+
   const handlePresetClick = (jql: string) => {
     setCustomJql(jql)
     fetchIssues(jql)
@@ -154,11 +222,12 @@ function App() {
   }
 
   const handleIssueUpdate = async () => {
-    // Refresh issues after update
     await fetchIssues()
     if (selectedIssue) {
       handleIssueClick(selectedIssue.key)
     }
+    // Action-based refresh bypasses dedup
+    fetchCapacity()
   }
 
   const selectedProjectName = projects.find(p => p.key === selectedProject)?.name || 'All Projects'
@@ -206,12 +275,14 @@ function App() {
                 {theme === 'light' ? 'Dark' : 'Light'}
               </button>
               {activeView === 'kanban' && (
-                <button className="btn" onClick={() => fetchIssues()} disabled={loading}>
+                <button className="btn" onClick={() => { fetchIssues(); fetchCapacity(); }} disabled={loading}>
                   {loading ? 'Loading...' : 'Refresh'}
                 </button>
               )}
             </div>
           </div>
+
+          <CapacityBanner data={capacityData} />
 
           {activeView === 'kanban' && (
             <div className="filters">
@@ -341,19 +412,19 @@ function App() {
 
             {activeView === 'weekly' && (
               <div className="full-view">
-                <WeeklyTimesheet />
+                <WeeklyTimesheet refreshKey={refreshKey} silent={silentRefresh} />
               </div>
             )}
 
             {activeView === 'history' && (
               <div className="full-view">
-                <WeeklySummary />
+                <WeeklySummary refreshKey={refreshKey} silent={silentRefresh} />
               </div>
             )}
 
             {activeView === 'summary' && (
               <div className="full-view">
-                <WorklogSummary />
+                <WorklogSummary refreshKey={refreshKey} silent={silentRefresh} />
               </div>
             )}
           </main>
