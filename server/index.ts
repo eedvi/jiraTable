@@ -851,6 +851,93 @@ app.get('/api/worklogs/weeks', async (req, res) => {
   }
 });
 
+// Get weekly capacity (estimated vs logged hours)
+app.get('/api/capacity', async (_req, res) => {
+  try {
+    // Get current user
+    const userResponse = await jiraApi.get('/myself');
+    const accountId = userResponse.data.accountId;
+
+    // 1. Get estimated hours from open/in-progress assigned tickets
+    const estimateJql = 'assignee = currentUser() AND statusCategory != Done';
+    const estimateResponse = await jiraApi.get('/search/jql', {
+      params: {
+        jql: estimateJql,
+        fields: 'timeoriginalestimate',
+        maxResults: 200
+      }
+    });
+
+    let estimatedSeconds = 0;
+    let ticketCount = 0;
+    for (const issue of estimateResponse.data.issues || []) {
+      ticketCount++;
+      if (issue.fields.timeoriginalestimate) {
+        estimatedSeconds += issue.fields.timeoriginalestimate;
+      }
+    }
+
+    // 2. Get logged hours for current week
+    const now = new Date();
+    const currentDay = now.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+
+    const startDate = new Date();
+    startDate.setDate(now.getDate() - daysToMonday);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date();
+    const daysToSunday = currentDay === 0 ? 0 : 7 - currentDay;
+    endDate.setDate(now.getDate() + daysToSunday);
+    endDate.setHours(23, 59, 59, 999);
+
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const worklogJql = `worklogAuthor = currentUser() AND worklogDate >= "${startDateStr}" ORDER BY updated DESC`;
+    const worklogResponse = await jiraApi.get('/search/jql', {
+      params: {
+        jql: worklogJql,
+        fields: 'worklog',
+        maxResults: 1000
+      }
+    });
+
+    let loggedSeconds = 0;
+    for (const issue of worklogResponse.data.issues || []) {
+      try {
+        const wlResponse = await jiraApi.get(`/issue/${issue.key}/worklog`);
+        for (const worklog of wlResponse.data.worklogs || []) {
+          if (worklog.author.accountId === accountId) {
+            const worklogDate = new Date(worklog.started);
+            if (worklogDate >= startDate && worklogDate <= endDate) {
+              loggedSeconds += worklog.timeSpentSeconds;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Error fetching worklogs for ${issue.key}:`, err);
+      }
+    }
+
+    const weeklyGoalHours = 40;
+    const estimatedHours = Math.round((estimatedSeconds / 3600) * 100) / 100;
+    const loggedHours = Math.round((loggedSeconds / 3600) * 100) / 100;
+
+    res.json({
+      estimatedSeconds,
+      estimatedHours,
+      loggedSeconds,
+      loggedHours,
+      weeklyGoalHours,
+      estimatedPercent: Math.round((estimatedHours / weeklyGoalHours) * 100),
+      loggedPercent: Math.round((loggedHours / weeklyGoalHours) * 100),
+      ticketCount
+    });
+  } catch (error: any) {
+    console.error('Error fetching capacity:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch capacity', details: error.response?.data });
+  }
+});
+
 // Health check
 app.get('/api/health', async (_req, res) => {
   try {
