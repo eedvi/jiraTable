@@ -54,15 +54,20 @@ function getProgressLabel(hours: number, goalHours: number = 40): string {
   return 'Por debajo'
 }
 
-export default function WeeklySummary() {
+interface WeeklySummaryProps {
+  refreshKey?: number
+  silent?: boolean
+}
+
+export default function WeeklySummary({ refreshKey, silent }: WeeklySummaryProps) {
   const [data, setData] = useState<WeeklySummaryResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [weeksBack, setWeeksBack] = useState(12)
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'daily' | 'tasks'>('daily')
 
-  const fetchWeeklySummary = async () => {
-    setLoading(true)
+  const fetchWeeklySummary = async (isSilent: boolean = false) => {
+    if (!isSilent) setLoading(true)
     try {
       const res = await fetch(`/api/worklogs/weeks?weeksBack=${weeksBack}`)
       const result = await res.json()
@@ -71,13 +76,19 @@ export default function WeeklySummary() {
     } catch (error) {
       console.error('Error fetching weekly summary:', error)
     } finally {
-      setLoading(false)
+      if (!isSilent) setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchWeeklySummary()
   }, [weeksBack])
+
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      fetchWeeklySummary(silent ?? false)
+    }
+  }, [refreshKey])
 
   if (loading) {
     return (

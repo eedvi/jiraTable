@@ -37,28 +37,39 @@ function formatDateTime(dateStr: string): string {
   return `${dateFormatted} ${timeFormatted}`
 }
 
-export default function WorklogSummary() {
+interface WorklogSummaryProps {
+  refreshKey?: number
+  silent?: boolean
+}
+
+export default function WorklogSummary({ refreshKey, silent }: WorklogSummaryProps) {
   const [period, setPeriod] = useState<'week' | 'month' | 'all'>('week')
   const [data, setData] = useState<WorklogData | null>(null)
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
-  const fetchWorklogs = async () => {
-    setLoading(true)
+  const fetchWorklogs = async (isSilent: boolean = false) => {
+    if (!isSilent) setLoading(true)
     try {
       const res = await fetch(`/api/worklogs?period=${period}`)
       const result = await res.json()
       setData(result)
-    } catch (err) {
-      console.error('Error fetching worklogs:', err)
+    } catch (error) {
+      console.error('Error fetching worklogs:', error)
     } finally {
-      setLoading(false)
+      if (!isSilent) setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchWorklogs()
   }, [period])
+
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      fetchWorklogs(silent ?? false)
+    }
+  }, [refreshKey])
 
   const getPeriodLabel = () => {
     switch (period) {

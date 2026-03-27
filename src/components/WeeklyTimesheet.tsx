@@ -91,13 +91,18 @@ function detectTimeConflicts(worklogs: Worklog[]): WorklogWithConflict[] {
   return worklogsWithTimes
 }
 
-export default function WeeklyTimesheet() {
+interface WeeklyTimesheetProps {
+  refreshKey?: number
+  silent?: boolean
+}
+
+export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetProps) {
   const [data, setData] = useState<TimesheetData | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
 
-  const fetchTimesheet = async () => {
-    setLoading(true)
+  const fetchTimesheet = async (isSilent: boolean = false) => {
+    if (!isSilent) setLoading(true)
     try {
       const res = await fetch('/api/worklogs/daily')
       const result = await res.json()
@@ -105,13 +110,19 @@ export default function WeeklyTimesheet() {
     } catch (err) {
       console.error('Error fetching timesheet:', err)
     } finally {
-      setLoading(false)
+      if (!isSilent) setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchTimesheet()
   }, [])
+
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      fetchTimesheet(silent ?? false)
+    }
+  }, [refreshKey])
 
   const getProgressColor = (progress: number): string => {
     if (progress >= 100) return 'success'
