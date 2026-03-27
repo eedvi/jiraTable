@@ -2,7 +2,7 @@ import { CapacityData } from '../types'
 
 function getEstimatedColor(percent: number): string {
   if (percent > 100) return 'var(--color-error)'
-  if (percent > 80) return '#f59e0b'
+  if (percent > 80) return 'var(--color-warning, #f59e0b)'
   return 'var(--color-success)'
 }
 

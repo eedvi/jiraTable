@@ -43,7 +43,7 @@ function App() {
   // Auto-refresh
   const [refreshKey, setRefreshKey] = useState(0)
   const [silentRefresh, setSilentRefresh] = useState(false)
-  const lastFetchedRef = useRef<Record<string, number>>({})
+  const lastFetchedRef = useRef<Record<string, number>>({ kanban: Date.now() })
 
   useEffect(() => {
     fetchProjects()
