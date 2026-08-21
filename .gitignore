@@ -5,3 +5,11 @@ dist/
 
 # Claude Code - ignorar settings personales, compartir comandos
 .claude/settings.local.json
+
+# Claude Code scratch files
+tmpclaude-*-cwd
+
+# Superpowers runtime state (brainstorm output itself is tracked)
+.superpowers/**/.events
+.superpowers/**/.server.pid
+.superpowers/**/.server-stopped
