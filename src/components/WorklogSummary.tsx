@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { readCache, writeCache } from '../lib/cache'
 
 interface WorklogData {
   period: string
@@ -25,12 +26,12 @@ function formatHours(seconds: number): string {
 
 function formatDateTime(dateStr: string): string {
   const date = new Date(dateStr)
-  const dateFormatted = date.toLocaleDateString('es-ES', {
+  const dateFormatted = date.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric'
   })
-  const timeFormatted = date.toLocaleTimeString('es-ES', {
+  const timeFormatted = date.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit'
   })
@@ -47,14 +48,20 @@ export default function WorklogSummary({ refreshKey, silent }: WorklogSummaryPro
   const [data, setData] = useState<WorklogData | null>(null)
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [stale, setStale] = useState(false)
 
   const fetchWorklogs = async (isSilent: boolean = false) => {
     if (!isSilent) setLoading(true)
     try {
       const res = await fetch(`/api/worklogs?period=${period}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const result = await res.json()
       setData(result)
+      setStale(false)
+      writeCache(`worklogs:${period}`, result)
     } catch (error) {
+      // Offline / API down: keep the cached copy on screen, flagged as stale
+      setStale(true)
       console.error('Error fetching worklogs:', error)
     } finally {
       if (!isSilent) setLoading(false)
@@ -62,7 +69,10 @@ export default function WorklogSummary({ refreshKey, silent }: WorklogSummaryPro
   }
 
   useEffect(() => {
-    fetchWorklogs()
+    // Paint cached period instantly, then revalidate silently.
+    const cached = readCache<WorklogData>(`worklogs:${period}`)
+    if (cached) setData(cached)
+    fetchWorklogs(!!cached)
   }, [period])
 
   useEffect(() => {
@@ -73,52 +83,48 @@ export default function WorklogSummary({ refreshKey, silent }: WorklogSummaryPro
 
   const getPeriodLabel = () => {
     switch (period) {
-      case 'week': return 'Esta semana (Lun-Dom)'
-      case 'month': return 'Este mes'
-      case 'all': return 'Último año'
+      case 'week': return 'This week (Mon-Sun)'
+      case 'month': return 'This month'
+      case 'all': return 'Last year'
     }
   }
 
   return (
     <div className="worklog-summary window">
-      <div className="title-bar">
-        <button aria-label="Close" className="close"></button>
-        <h1 className="title">Tiempo Logeado</h1>
-        <button aria-label="Resize" className="resize"></button>
-      </div>
-      <div className="separator"></div>
-
-      <div className="window-pane worklog-content">
+      <div className={`window-pane worklog-content ${loading && data ? 'is-refreshing' : ''}`} aria-busy={loading}>
         <div className="worklog-header">
           <div className="period-selector">
             <button
               className={`btn ${period === 'week' ? 'btn-default' : ''}`}
               onClick={() => setPeriod('week')}
             >
-              Semana
+              Week
             </button>
             <button
               className={`btn ${period === 'month' ? 'btn-default' : ''}`}
               onClick={() => setPeriod('month')}
             >
-              Mes
+              Month
             </button>
             <button
               className={`btn ${period === 'all' ? 'btn-default' : ''}`}
               onClick={() => setPeriod('all')}
             >
-              Todo
+              All
             </button>
           </div>
         </div>
 
-        {loading ? (
-          <div className="loading">Cargando...</div>
+        {loading && !data ? (
+          <div className="loading">Loading...</div>
         ) : data ? (
           <>
             <div className="worklog-total">
-              <div className="total-label">{getPeriodLabel()}</div>
-              <div className="total-hours">{data.totalHours.toFixed(2)} horas</div>
+              <div className="total-label">
+                {getPeriodLabel()}
+                {stale && <span className="stale-pill" role="status">offline — cached</span>}
+              </div>
+              <div className="total-hours">{data.totalHours.toFixed(2)} hours</div>
               <div className="total-time">{formatHours(data.totalSeconds)}</div>
             </div>
 
@@ -128,7 +134,7 @@ export default function WorklogSummary({ refreshKey, silent }: WorklogSummaryPro
                   className="btn toggle-details"
                   onClick={() => setExpanded(!expanded)}
                 >
-                  {expanded ? '▲ Ocultar detalles' : '▼ Ver detalles'}
+                  {expanded ? '▲ Hide details' : '▼ View details'}
                 </button>
 
                 {expanded && (
@@ -165,7 +171,7 @@ export default function WorklogSummary({ refreshKey, silent }: WorklogSummaryPro
             )}
           </>
         ) : (
-          <div className="no-data">No hay datos disponibles</div>
+          <div className="no-data">No data available</div>
         )}
       </div>
     </div>

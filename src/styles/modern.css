@@ -1,27 +1,43 @@
 /* ===================================
    MINIMALIST DESIGN SYSTEM - VARIABLES
    =================================== */
+/* ===================================
+   RETRO DESKTOP THEME — cream / teal / black, monospace, brutalist
+   (design inspiration: 90s zine desktop OS)
+   Complete token set: also defines vars modern.css referenced but never
+   declared, so previously-broken styles now resolve.
+   =================================== */
 :root {
-  /* Primary Color - Single accent */
-  --color-primary: #000000;
-  --color-accent: #0066ff;
+  /* Emphasis / fills — black in light for the brutalist ink look */
+  --color-primary: #1b1a17;
+  --color-primary-hover: #000000;
+  --color-primary-light: #e7dfc9;   /* pale tint for selected rows */
+  --color-accent: #2f8f9d;          /* teal */
 
-  /* Neutral Colors - Grayscale only */
-  --color-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-border: #e5e5e5;
-  --color-border-light: #f0f0f0;
-  --color-text: #171717;
-  --color-text-secondary: #737373;
-  --color-text-tertiary: #a3a3a3;
+  /* Neutrals — warm cream paper */
+  --color-bg: #ddd2b8;              /* tan desktop (shows behind window) */
+  --color-surface: #f4efe0;         /* cream card / window */
+  --color-border: #1b1a17;          /* near-black ink border */
+  --color-border-light: #cabf9f;    /* muted divider / bar track */
+  --color-text: #1b1a17;
+  --color-text-secondary: #57503f;
+  --color-text-tertiary: #6f6754;  /* darkened: #8a8067 was 2.6:1 on cream */
 
-  /* Semantic Colors - Minimal */
-  --color-error: #dc2626;
-  --color-success: #16a34a;
+  /* Semantic */
+  --color-error: #c8503a;
+  --color-danger: #c8503a;
+  --color-danger-light: #f0dccf;
+  --color-warning: #d99a2b;
+  --color-success: #4e8a3c;
+  --color-info: #2f8f9d;
 
-  /* Shadows - Subtle only */
-  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  /* Hard offset shadows — no blur (brutalist) */
+  --shadow-color: #1b1a17;
+  --shadow: 2px 2px 0 var(--shadow-color);
+  --shadow-sm: 2px 2px 0 var(--shadow-color);
+  --shadow-md: 3px 3px 0 var(--shadow-color);
+  --shadow-lg: 4px 4px 0 var(--shadow-color);
+  --shadow-xl: 6px 6px 0 var(--shadow-color);
 
   /* Spacing */
   --space-xs: 0.25rem;
@@ -29,24 +45,41 @@
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2rem;
+  --space-2xl: 3rem;
 
-  /* Border Radius - Minimal */
-  --radius: 0.25rem;
+  /* Border radius — sharp corners everywhere */
+  --radius: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
 
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+  /* Typography — monospace throughout for the terminal/zine feel */
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace;
+  --font-sans: var(--font-mono);
 }
 
 [data-theme="dark"] {
-  --color-bg: #0a0a0a;
-  --color-surface: #171717;
-  --color-border: #262626;
-  --color-border-light: #1f1f1f;
-  --color-text: #fafafa;
-  --color-text-secondary: #a3a3a3;
-  --color-text-tertiary: #737373;
-  --color-accent: #3b82f6;
+  --color-primary: #3fa9ba;          /* teal emphasis reads on dark */
+  --color-primary-hover: #57bccb;
+  --color-primary-light: rgba(63, 169, 186, 0.16);
+  --color-accent: #3fa9ba;
+
+  --color-bg: #1b1a16;
+  --color-surface: #26241f;
+  --color-border: #4d4838;
+  --color-border-light: #34322a;
+  --color-text: #ece2cb;
+  --color-text-secondary: #b7ac90;
+  --color-text-tertiary: #837a63;
+
+  --color-error: #e06a52;
+  --color-danger: #e06a52;
+  --color-danger-light: #3a221c;
+  --color-warning: #e0a93b;
+  --color-success: #6fa85c;
+  --color-info: #3fa9ba;
+
+  --shadow-color: #000000;
 }
 
 /* ===================================
@@ -334,6 +367,7 @@ textarea {
 
 .project-dropdown {
   position: absolute;
+  overflow-x: hidden;
   top: calc(100% + var(--space-sm));
   left: 0;
   right: 0;
@@ -518,22 +552,6 @@ main.with-panel {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-}
-
-.kanban-header {
-  padding: var(--space-lg);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.column-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .issue-count {
@@ -723,13 +741,13 @@ main.with-panel {
 }
 
 /* Daily Grid */
-.daily-grid {
+.timesheet-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-lg);
 }
 
-.full-view .daily-grid {
+.full-view .timesheet-grid {
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
 }
 
@@ -2000,10 +2018,6 @@ main.with-panel {
   background: rgba(255, 255, 255, 0.05);
 }
 
-[data-theme="dark"] .nav-tab.active {
-  color: var(--color-primary);
-}
-
 [data-theme="dark"] .day-worklogs {
   background: rgba(255, 255, 255, 0.02);
 }
@@ -2024,6 +2038,259 @@ main.with-panel {
 
 [data-theme="dark"] .worklog-timerange {
   color: var(--color-text-tertiary);
+}
+
+/* ===================================
+   RETRO CHROME OVERRIDES
+   Brutalist windows/cards, ink borders, hard offset shadows,
+   monospace controls, teal accents. Appended last so it wins
+   over the earlier system.css + index.css layers.
+   =================================== */
+
+/* Desktop wallpaper: cream + soft teal waves (frames the window) */
+body {
+  background-color: var(--color-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='300'%3E%3Crect width='480' height='300' fill='%23ddd2b8'/%3E%3Cpath d='M-40,90 C90,40 200,150 280,100 C360,55 430,120 520,80' fill='none' stroke='%23a6c6c3' stroke-width='34' opacity='0.55'/%3E%3Cpath d='M-40,210 C110,160 210,260 300,210 C380,168 440,230 520,195' fill='none' stroke='%238bb9b8' stroke-width='30' opacity='0.45'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+[data-theme="dark"] body { background-image: none; }
+
+/* Main window — thick ink border + big offset shadow */
+.app > .window {
+  border: 2px solid var(--color-border);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Title bar: cream strip, both round window controls pinned left */
+.title-bar {
+  gap: 6px;
+  background: var(--color-surface);
+  border-bottom: 2px solid var(--color-border);
+}
+.title-bar .close,
+.title-bar .resize {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  min-width: 0;
+  padding: 0;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  box-shadow: none;
+  cursor: pointer;
+}
+.title-bar .close { order: 0; }
+.title-bar .resize { order: 1; }
+.title-bar .title { order: 2; }
+
+/* Cards & panels — sharp ink boxes with a hard shadow */
+.kanban-column,
+.kanban-card,
+.detail-panel.window,
+.day-card,
+.week-card,
+.stat-card,
+.worklog-total,
+.timesheet-header,
+.worklog-header,
+.weeks-list,
+.comment,
+.standard-dialog,
+.worklog-history-item {
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: var(--shadow-sm);
+}
+.kanban-card:hover,
+.day-card:hover,
+.week-card:hover,
+.stat-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border);
+}
+
+/* Kanban surfaces */
+.kanban-board { background: transparent; }
+.kanban-column.outer-border {
+  background: var(--color-surface);
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border-bottom: 2px solid var(--color-border);
+}
+
+/* Buttons — pressable ink chips */
+.btn,
+.project-selector-btn {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.12s ease;
+}
+.btn:hover,
+.project-selector-btn:hover {
+  background: var(--color-primary-light);
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+.btn:active { transform: translate(2px, 2px); box-shadow: none; }
+.btn:disabled { box-shadow: none; transform: none; }
+.btn-default,
+.btn.active-tab,
+.preset-buttons button.active {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+/* Inputs — inset ink fields */
+input[type="text"],
+input[type="number"],
+textarea,
+select,
+.search-input,
+.project-search input {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Nav tabs — active is a solid ink block */
+.nav-tab { font-family: var(--font-mono); font-weight: 600; }
+.nav-tab.active {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border-bottom-color: var(--color-border);
+}
+
+/* Status / badges / pills */
+.status,
+.card-label,
+.week-badge,
+.today-badge {
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+}
+.week-badge,
+.status-indeterminate {
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+.column-count,
+.issue-count {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border-radius: 0;
+}
+
+/* Progress + capacity bars — ink frame, teal/green/mustard/coral fills */
+.progress-bar,
+.capacity-bar-track {
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+}
+.progress-fill,
+.capacity-bar-logged { background: var(--color-accent); }
+.progress-fill.success { background: var(--color-success); }
+.progress-fill.warning { background: var(--color-warning); }
+.progress-fill.danger  { background: var(--color-danger); }
+
+/* Timeline bars */
+.timeline-bar { border: 2px solid var(--color-border); border-radius: 0; box-shadow: var(--shadow-sm); }
+.timeline-bar.conflict { background: var(--color-danger); }
+
+/* --- Fix stale index.css conflicts (purple gradients / invisible text) --- */
+.weekly-summary-header {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+}
+.summary-title,
+.summary-subtitle,
+.selector-label { color: var(--color-text); }
+
+/* Explicit "adjust due dates" action (replaces the old write-on-read) */
+.adjust-dates-btn { width: 100%; margin-top: var(--space-md); }
+.adjust-msg {
+  margin-top: var(--space-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-align: center;
+}
+
+/* Background-revalidation hint (cached data already shown) */
+.sync-pill {
+  margin-left: var(--space-md);
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  border: 2px solid var(--color-accent);
+  border-radius: 0;
+  white-space: nowrap;
+}
+
+.stat-primary,
+.stat-secondary,
+.stat-success {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.stat-primary  { border-left: 6px solid var(--color-accent); }
+.stat-secondary{ border-left: 6px solid var(--color-danger); }
+.stat-success  { border-left: 6px solid var(--color-success); }
+.stat-icon, .stat-value, .stat-label, .stat-sublabel { color: inherit; }
+
+.view-mode-toggle {
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 0;
+}
+.toggle-btn { color: var(--color-text-secondary); font-family: var(--font-mono); }
+.toggle-btn.active {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-weight: 700;
+}
+
+.daily-item.weekend {
+  background: var(--color-primary-light);
+  border-left: 3px solid var(--color-warning);
+}
+.task-item { border-left: 3px solid var(--color-accent); }
+
+/* Scrollbars — cream track, ink thumb (matches the boxy chrome) */
+::-webkit-scrollbar { width: 14px; height: 14px; }
+::-webkit-scrollbar-track { background: var(--color-surface); }
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  border-radius: 0;
 }
 
 /* ===================================
@@ -2093,4 +2360,391 @@ main.with-panel {
 .capacity-status-tickets {
   color: var(--color-text-tertiary);
   font-weight: 400;
+}
+
+/* ===================================
+   MERGED FROM index.css
+   Rules that lived only in the legacy sheet, re-expressed in theme tokens.
+   =================================== */
+
+/* Kanban column body */
+.kanban-column-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  margin: 0;
+}
+
+.kanban-column-body.sunken-panel {
+  background: var(--color-bg);
+  margin: var(--space-xs);
+}
+
+.column-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Kanban card internals */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.card-type-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.card-key {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.card-priority-icon {
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+}
+
+.card-summary {
+  font-size: 0.75rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-sm);
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card-labels {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.card-avatar {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+}
+
+.card-unassigned {
+  width: 20px;
+  height: 20px;
+  background: var(--color-border-light);
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+}
+
+.card-status-select {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.card-status-select select {
+  width: 100%;
+  padding: var(--space-xs);
+  font-size: 0.625rem;
+  cursor: pointer;
+}
+
+.status-toggle-btn {
+  width: 100%;
+  font-size: 0.625rem;
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+}
+
+/* Detail panel bits */
+.log-time {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px dashed var(--color-border-light);
+}
+
+.add-comment {
+  margin-bottom: var(--space-lg);
+}
+
+.add-comment textarea {
+  width: 100%;
+  padding: var(--space-sm);
+  font-size: 0.75rem;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: var(--space-sm);
+  min-height: 80px;
+  text-transform: none;
+}
+
+.add-comment .btn {
+  width: 100%;
+}
+
+.subtasks-create {
+  margin-bottom: var(--space-md);
+}
+
+.worklog-details {
+  margin-top: var(--space-md);
+}
+
+.toggle-details {
+  width: 100%;
+  margin-bottom: var(--space-md);
+}
+
+/* Misc */
+.star-placeholder {
+  width: 22px;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.header-content {
+  margin-bottom: var(--space-lg);
+}
+
+.unassigned {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ===================================
+   FOCUS VISIBILITY
+   =================================== */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ===================================
+   REFRESH / STALE STATES
+   Content stays mounted while revalidating — no layout jump.
+   =================================== */
+.is-refreshing {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.stale-pill {
+  margin-left: var(--space-md);
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-danger);
+  border: 2px solid var(--color-danger);
+  white-space: nowrap;
+}
+
+.updated-at {
+  margin-left: var(--space-md);
+  font-size: 0.7rem;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ===================================
+   RESPONSIVE
+   =================================== */
+@media (max-width: 1100px) {
+  main.with-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-panel.window {
+    max-width: none;
+  }
+
+  .kanban-column {
+    flex: 0 0 280px;
+  }
+}
+
+@media (max-width: 900px) {
+  body {
+    padding: 0;
+  }
+
+  main {
+    padding: var(--space-md);
+  }
+
+  .main-navigation {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+  }
+
+  .nav-tabs {
+    overflow-x: auto;
+  }
+
+  .nav-tab {
+    white-space: nowrap;
+  }
+
+  .filters {
+    padding: var(--space-md);
+  }
+
+  .filters .field-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .filters .field-row > label {
+    min-width: 0;
+  }
+
+  .timesheet-grid,
+  .full-view .timesheet-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .capacity-banner {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .capacity-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "label bar"
+      "value status";
+    gap: var(--space-xs) var(--space-sm);
+  }
+
+  .capacity-label  { grid-area: label; width: auto; }
+  .capacity-bar-track { grid-area: bar; }
+  .capacity-value  { grid-area: value; width: auto; text-align: left; }
+  .capacity-status { grid-area: status; width: auto; }
+
+  .kanban-column {
+    flex: 0 0 88vw;
+  }
+
+  .timesheet-grid,
+  .full-view .timesheet-grid,
+  .daily-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .kanban-card:hover,
+  .day-card:hover,
+  .week-card:hover,
+  .stat-card:hover,
+  .btn:hover,
+  .btn:active {
+    transform: none;
+  }
+}
+
+/* Project dropdown rows — the option is a real <button> now, so reset it
+   and keep the star as a sibling control instead of a nested one. */
+.project-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+
+.project-option-row .star-btn {
+  flex-shrink: 0;
+  padding-left: var(--space-md);
+}
+
+.project-option {
+  width: 100%;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.project-option-row .project-option {
+  padding-left: var(--space-sm);
+}
+
+/* Name truncates, key keeps its column — one line per project */
+.project-option > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-key {
+  flex-shrink: 0;
+}
+
+/* Labels must not push the card wider than its column */
+.card-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 5px;
+  font-size: 0.625rem;
+}
+
+.card-labels {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.column-count {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  font-size: 0.6875rem;
+}
+
+/* The retro close dot stays 13px, but the tap target must not be:
+   an invisible pad brings it to ~25px (WCAG 2.5.8). */
+.title-bar .close {
+  position: relative;
+}
+
+.title-bar .close::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
 }

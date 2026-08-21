@@ -2,13 +2,13 @@ import { CapacityData } from '../types'
 
 function getEstimatedColor(percent: number): string {
   if (percent > 100) return 'var(--color-error)'
-  if (percent > 80) return 'var(--color-warning, #f59e0b)'
+  if (percent > 80) return 'var(--color-warning)'
   return 'var(--color-success)'
 }
 
 function getEstimatedLabel(percent: number): string {
-  if (percent > 100) return 'Sobrecarga'
-  if (percent > 80) return 'Cerca del limite'
+  if (percent > 100) return 'Overloaded'
+  if (percent > 80) return 'Near limit'
   return 'OK'
 }
 
@@ -25,8 +25,16 @@ export default function CapacityBanner({ data }: CapacityBannerProps) {
   return (
     <div className="capacity-banner">
       <div className="capacity-row">
-        <span className="capacity-label">Estimado</span>
-        <div className="capacity-bar-track">
+        <span className="capacity-label" id="capacity-estimated-label">Estimated</span>
+        <div
+          className="capacity-bar-track"
+          role="progressbar"
+          aria-labelledby="capacity-estimated-label"
+          aria-valuenow={data.estimatedPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuetext={`${data.estimatedHours} of ${data.weeklyGoalHours} hours — ${estimatedLabel}`}
+        >
           <div
             className="capacity-bar-fill capacity-bar-estimated"
             style={{
@@ -41,8 +49,16 @@ export default function CapacityBanner({ data }: CapacityBannerProps) {
         </span>
       </div>
       <div className="capacity-row">
-        <span className="capacity-label">Registrado</span>
-        <div className="capacity-bar-track">
+        <span className="capacity-label" id="capacity-logged-label">Logged</span>
+        <div
+          className="capacity-bar-track"
+          role="progressbar"
+          aria-labelledby="capacity-logged-label"
+          aria-valuenow={data.loggedPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuetext={`${data.loggedHours} of ${data.weeklyGoalHours} hours logged`}
+        >
           <div
             className="capacity-bar-fill capacity-bar-logged"
             style={{

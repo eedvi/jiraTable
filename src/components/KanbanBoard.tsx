@@ -20,14 +20,7 @@ interface Props {
 interface StatusColumn {
   key: string
   name: string
-  color: string
   issues: JiraIssue[]
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  new: '#dfe1e6',
-  indeterminate: '#deebff',
-  done: '#e3fcef',
 }
 
 export default function KanbanBoard({ issues, loading, onIssueClick, onStatusChange }: Props) {
@@ -43,7 +36,6 @@ export default function KanbanBoard({ issues, loading, onIssueClick, onStatusCha
         statusMap.set(name, {
           key,
           name,
-          color: STATUS_COLORS[key] || STATUS_COLORS.new,
           issues: [],
         })
       }
@@ -57,7 +49,8 @@ export default function KanbanBoard({ issues, loading, onIssueClick, onStatusCha
     )
   }, [issues])
 
-  if (loading) {
+  // Only blank the board on a cold load — a refresh dims what is already there.
+  if (loading && issues.length === 0) {
     return <div className="loading">Loading issues...</div>
   }
 
@@ -66,7 +59,7 @@ export default function KanbanBoard({ issues, loading, onIssueClick, onStatusCha
   }
 
   return (
-    <div className="kanban-board">
+    <div className={`kanban-board ${loading ? 'is-refreshing' : ''}`} aria-busy={loading}>
       {columns.map((column) => (
         <div key={column.name} className="kanban-column outer-border">
           <div className="kanban-column-header">
@@ -138,6 +131,7 @@ function KanbanCard({ issue, onClick, onStatusChange }: CardProps) {
         body: JSON.stringify({ transitionId })
       })
       if (res.ok) {
+        setShowStatusSelect(false)
         onStatusChange?.()
       }
     } catch (err) {
@@ -156,8 +150,22 @@ function KanbanCard({ issue, onClick, onStatusChange }: CardProps) {
     onClick?.()
   }
 
+  const handleCardKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClick?.()
+    }
+  }
+
   return (
-    <div className="kanban-card" onClick={handleClick}>
+    <div
+      className="kanban-card"
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={handleCardKeyDown}
+    >
       <div className="card-header">
         <img
           src={fields.issuetype?.iconUrl}
@@ -198,7 +206,12 @@ function KanbanCard({ issue, onClick, onStatusChange }: CardProps) {
       </div>
       <div className="card-status-select" onClick={(e) => e.stopPropagation()}>
         {!showStatusSelect ? (
-          <button className="btn status-toggle-btn" onClick={handleShowStatus}>
+          <button
+            className="btn status-toggle-btn"
+            onClick={handleShowStatus}
+            aria-expanded={showStatusSelect}
+            aria-label={`Change status of ${issue.key}, currently ${fields.status.name}`}
+          >
             → {fields.status.name}
           </button>
         ) : (
@@ -207,7 +220,8 @@ function KanbanCard({ issue, onClick, onStatusChange }: CardProps) {
             disabled={changing || loadingTransitions}
             defaultValue=""
             autoFocus
-            onBlur={() => setTimeout(() => setShowStatusSelect(false), 200)}
+            aria-label={`Move ${issue.key} to another status`}
+            onKeyDown={(e) => e.key === 'Escape' && setShowStatusSelect(false)}
           >
             <option value="" disabled>
               {loadingTransitions ? 'Loading...' : changing ? 'Changing...' : 'Move to...'}

@@ -15,6 +15,14 @@ const PRESET_FILTERS = [
 ]
 
 type Theme = 'light' | 'dark'
+type View = 'kanban' | 'weekly' | 'history' | 'summary'
+
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'kanban', label: 'Kanban Board' },
+  { id: 'weekly', label: 'Current Week' },
+  { id: 'history', label: 'Weekly History' },
+  { id: 'summary', label: 'Overview' },
+]
 
 function App() {
   const [issues, setIssues] = useState<JiraIssue[]>([])
@@ -35,7 +43,7 @@ function App() {
   })
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [projectSearch, setProjectSearch] = useState('')
-  const [activeView, setActiveView] = useState<'kanban' | 'weekly' | 'history' | 'summary'>('kanban')
+  const [activeView, setActiveView] = useState<View>('kanban')
 
   // Capacity banner
   const [capacityData, setCapacityData] = useState<CapacityData | null>(null)
@@ -43,6 +51,7 @@ function App() {
   // Auto-refresh
   const [refreshKey, setRefreshKey] = useState(0)
   const [silentRefresh, setSilentRefresh] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const lastFetchedRef = useRef<Record<string, number>>({ kanban: Date.now() })
 
   useEffect(() => {
@@ -66,8 +75,15 @@ function App() {
         setProjectDropdownOpen(false)
       }
     }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProjectDropdownOpen(false)
+    }
     document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [])
 
   const sortedProjects = useMemo(() => {
@@ -92,6 +108,16 @@ function App() {
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
+  }
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    if (!delta) return
+    e.preventDefault()
+    const i = VIEWS.findIndex(v => v.id === activeView)
+    const next = VIEWS[(i + delta + VIEWS.length) % VIEWS.length]
+    setActiveView(next.id)
+    document.getElementById(`tab-${next.id}`)?.focus()
   }
 
   const fetchProjects = async () => {
@@ -122,6 +148,7 @@ function App() {
       }
 
       setIssues(data.issues || [])
+      setLastUpdated(Date.now())
     } catch (err: any) {
       setError(err.message)
       setIssues([])
@@ -133,6 +160,7 @@ function App() {
   const fetchCapacity = useCallback(async () => {
     try {
       const res = await fetch('/api/capacity')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (!data.error) {
         setCapacityData(data)
@@ -158,38 +186,65 @@ function App() {
     }
   }, [customJql, selectedProject])
 
-  // Auto-refresh on view switch (with 30s dedup)
-  useEffect(() => {
-    const last = lastFetchedRef.current[activeView] || 0
-    if (Date.now() - last > 30000) {
-      setSilentRefresh(true)
-      setRefreshKey(prev => prev + 1)
-      fetchCapacity()
-      // For kanban, silently refresh issues
-      if (activeView === 'kanban') {
-        fetchIssuesSilent()
-      }
-      lastFetchedRef.current = { ...lastFetchedRef.current, [activeView]: Date.now() }
-    }
+  // One silent refresh of the active view's live data (today / current week +
+  // capacity, and kanban issues). History views revalidate from cache on mount.
+  const doSilentRefresh = useCallback(() => {
+    setSilentRefresh(true)
+    setRefreshKey(prev => prev + 1)
+    fetchCapacity()
+    if (activeView === 'kanban') fetchIssuesSilent()
+    lastFetchedRef.current[activeView] = Date.now()
+    setLastUpdated(Date.now())
   }, [activeView, fetchCapacity, fetchIssuesSilent])
 
-  // Background polling every 10 minutes
+  // Refresh only if the active view's data is older than maxAgeMs (dedup guard).
+  const refreshIfStale = useCallback((maxAgeMs = 30000) => {
+    const last = lastFetchedRef.current[activeView] || 0
+    if (Date.now() - last > maxAgeMs) doSilentRefresh()
+  }, [activeView, doSilentRefresh])
+
+  // Auto-refresh when switching into a view (30s dedup; no double-fetch on mount)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSilentRefresh(true)
-      setRefreshKey(prev => prev + 1)
-      fetchCapacity()
-      if (activeView === 'kanban') {
-        fetchIssuesSilent()
-      }
-    }, 10 * 60 * 1000)
+    refreshIfStale(30000)
+  }, [activeView, refreshIfStale])
+
+  // Background floor: poll every 10 min so the current day stays current
+  // while the tab sits open.
+  useEffect(() => {
+    const interval = setInterval(doSilentRefresh, 10 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [activeView, fetchCapacity, fetchIssuesSilent])
+  }, [doSilentRefresh])
+
+  // Snap fresh the moment the user returns to the tab / window (30s dedup),
+  // covering long-idle tabs and the midnight day rollover without waiting for
+  // the next poll.
+  useEffect(() => {
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') refreshIfStale(30000)
+    }
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    window.addEventListener('focus', refreshOnReturn)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+      window.removeEventListener('focus', refreshOnReturn)
+    }
+  }, [refreshIfStale])
 
   // Fetch capacity on mount
   useEffect(() => {
     fetchCapacity()
   }, [fetchCapacity])
+
+  // Manual refresh works on every view: kanban refetches issues, the
+  // time-tracking views react to the refreshKey bump.
+  const handleManualRefresh = () => {
+    setSilentRefresh(false)
+    setRefreshKey(prev => prev + 1)
+    fetchCapacity()
+    if (activeView === 'kanban') fetchIssues()
+    lastFetchedRef.current[activeView] = Date.now()
+    setLastUpdated(Date.now())
+  }
 
   const handlePresetClick = (jql: string) => {
     setCustomJql(jql)
@@ -236,49 +291,46 @@ function App() {
     <div className="app">
       <div className="window">
         <div className="title-bar">
-          <button aria-label="Close" className="close"></button>
           <h1 className="title">Jira Tickets</h1>
-          <button aria-label="Resize" className="resize"></button>
         </div>
-        <div className="separator"></div>
 
         <div className="window-pane">
           <div className="main-navigation">
-            <div className="nav-tabs">
-              <button
-                className={`nav-tab ${activeView === 'kanban' ? 'active' : ''}`}
-                onClick={() => setActiveView('kanban')}
-              >
-                Tablero Kanban
-              </button>
-              <button
-                className={`nav-tab ${activeView === 'weekly' ? 'active' : ''}`}
-                onClick={() => setActiveView('weekly')}
-              >
-                Semana Actual
-              </button>
-              <button
-                className={`nav-tab ${activeView === 'history' ? 'active' : ''}`}
-                onClick={() => setActiveView('history')}
-              >
-                Historial Semanal
-              </button>
-              <button
-                className={`nav-tab ${activeView === 'summary' ? 'active' : ''}`}
-                onClick={() => setActiveView('summary')}
-              >
-                Resumen General
-              </button>
+            <div className="nav-tabs" role="tablist" aria-label="Views">
+              {VIEWS.map(view => (
+                <button
+                  key={view.id}
+                  id={`tab-${view.id}`}
+                  role="tab"
+                  type="button"
+                  aria-selected={activeView === view.id}
+                  aria-controls={`panel-${view.id}`}
+                  tabIndex={activeView === view.id ? 0 : -1}
+                  className={`nav-tab ${activeView === view.id ? 'active' : ''}`}
+                  onClick={() => setActiveView(view.id)}
+                  onKeyDown={handleTabKeyDown}
+                >
+                  {view.label}
+                </button>
+              ))}
             </div>
             <div className="nav-actions">
-              <button className="btn btn-icon" onClick={toggleTheme} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
+              {lastUpdated && (
+                <span className="updated-at">
+                  Updated {new Date(lastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              <button
+                type="button"
+                className="btn btn-icon"
+                onClick={toggleTheme}
+                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              >
                 {theme === 'light' ? 'Dark' : 'Light'}
               </button>
-              {activeView === 'kanban' && (
-                <button className="btn" onClick={() => { fetchIssues(); fetchCapacity(); }} disabled={loading}>
-                  {loading ? 'Loading...' : 'Refresh'}
-                </button>
-              )}
+              <button type="button" className="btn" onClick={handleManualRefresh} disabled={loading}>
+                {loading ? 'Loading...' : 'Refresh'}
+              </button>
             </div>
           </div>
 
@@ -290,14 +342,17 @@ function App() {
                 <label>Project:</label>
                 <div className="project-selector">
                 <button
+                  type="button"
                   className="btn project-selector-btn"
+                  aria-expanded={projectDropdownOpen}
+                  aria-haspopup="listbox"
                   onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
                 >
                   <span>{selectedProjectName}</span>
-                  <span className="dropdown-arrow">{projectDropdownOpen ? '▲' : '▼'}</span>
+                  <span className="dropdown-arrow" aria-hidden="true">{projectDropdownOpen ? '▲' : '▼'}</span>
                 </button>
             {projectDropdownOpen && (
-              <div className="project-dropdown">
+              <div className="project-dropdown" role="listbox" aria-label="Projects">
                 <div className="project-search">
                   <input
                     type="text"
@@ -309,13 +364,16 @@ function App() {
                   />
                 </div>
                 {!projectSearch && (
-                  <div
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selectedProject === ''}
                     className={`project-option ${selectedProject === '' ? 'selected' : ''}`}
                     onClick={() => { handleProjectChange(''); setProjectDropdownOpen(false); setProjectSearch('') }}
                   >
                     <span className="star-placeholder"></span>
                     <span>All Projects</span>
-                  </div>
+                  </button>
                 )}
                 {starredProjects.length > 0 && sortedProjects.some(p => starredProjects.includes(p.key)) && (
                   <div className="project-divider">Starred</div>
@@ -328,19 +386,27 @@ function App() {
                   return (
                     <div key={p.id}>
                       {showDivider && <div className="project-divider">Other Projects</div>}
-                      <div
-                        className={`project-option ${selectedProject === p.key ? 'selected' : ''}`}
-                        onClick={() => { handleProjectChange(p.key); setProjectDropdownOpen(false); setProjectSearch('') }}
-                      >
+                      <div className="project-option-row">
                         <button
+                          type="button"
                           className={`star-btn ${isStarred ? 'starred' : ''}`}
                           onClick={(e) => toggleStar(p.key, e)}
+                          aria-pressed={isStarred}
+                          aria-label={isStarred ? `Unstar ${p.name}` : `Star ${p.name}`}
                           title={isStarred ? 'Unstar project' : 'Star project'}
                         >
                           {isStarred ? '★' : '☆'}
                         </button>
-                        <span>{p.name}</span>
-                        <span className="project-key">{p.key}</span>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={selectedProject === p.key}
+                          className={`project-option ${selectedProject === p.key ? 'selected' : ''}`}
+                          onClick={() => { handleProjectChange(p.key); setProjectDropdownOpen(false); setProjectSearch('') }}
+                        >
+                          <span>{p.name}</span>
+                          <span className="project-key">{p.key}</span>
+                        </button>
                       </div>
                     </div>
                   )
@@ -382,7 +448,7 @@ function App() {
           )}
 
           {activeView === 'kanban' && error && (
-            <div className="standard-dialog">
+            <div className="standard-dialog" role="alert">
               <div className="dialog-text">{error}</div>
             </div>
           )}
@@ -390,7 +456,7 @@ function App() {
           <main className={selectedIssue && activeView === 'kanban' ? 'with-panel' : ''}>
             {activeView === 'kanban' && (
               <>
-                <div className="content">
+                <div className="content" id="panel-kanban" role="tabpanel" aria-labelledby="tab-kanban">
                   <KanbanBoard
                     issues={issues}
                     loading={loading}
@@ -411,19 +477,19 @@ function App() {
             )}
 
             {activeView === 'weekly' && (
-              <div className="full-view">
+              <div className="full-view" id="panel-weekly" role="tabpanel" aria-labelledby="tab-weekly">
                 <WeeklyTimesheet refreshKey={refreshKey} silent={silentRefresh} />
               </div>
             )}
 
             {activeView === 'history' && (
-              <div className="full-view">
+              <div className="full-view" id="panel-history" role="tabpanel" aria-labelledby="tab-history">
                 <WeeklySummary refreshKey={refreshKey} silent={silentRefresh} />
               </div>
             )}
 
             {activeView === 'summary' && (
-              <div className="full-view">
+              <div className="full-view" id="panel-summary" role="tabpanel" aria-labelledby="tab-summary">
                 <WorklogSummary refreshKey={refreshKey} silent={silentRefresh} />
               </div>
             )}

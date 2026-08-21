@@ -222,8 +222,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
         <div className="title-bar">
           <button aria-label="Close" className="close" onClick={onClose}></button>
           <h1 className="title">Loading...</h1>
-          <button aria-label="Resize" className="resize"></button>
-        </div>
+          </div>
       </div>
     )
   }
@@ -242,7 +241,6 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
             {issue.key}
           </a>
         </h1>
-        <button aria-label="Resize" className="resize"></button>
       </div>
       <div className="separator"></div>
 
@@ -291,7 +289,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
                 type="number"
                 value={storyPoints}
                 onChange={(e) => setStoryPoints(e.target.value)}
-                placeholder="e.g., 3"
+                placeholder="ej. 3"
                 step="0.5"
               />
               <button className="btn btn-default" onClick={handleUpdateStoryPoints} disabled={saving}>Save</button>
@@ -309,7 +307,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
         </div>
 
         <div className="section">
-          <h3>Time Tracking</h3>
+          <h3>Registro de tiempo</h3>
           <div className="time-grid">
             <div className="time-item">
               <span className="time-label">Original Estimate</span>
@@ -319,7 +317,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
                     type="text"
                     value={originalEstimate}
                     onChange={(e) => setOriginalEstimate(e.target.value)}
-                    placeholder="e.g., 2h 30m"
+                    placeholder="ej. 2h 30m"
                   />
                   <button className="btn btn-default" onClick={handleUpdateEstimate} disabled={saving}>Save</button>
                   <button className="btn" onClick={() => setEditing(null)}>Cancel</button>
@@ -352,7 +350,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
                   type="text"
                   value={timeSpent}
                   onChange={(e) => setTimeSpent(e.target.value)}
-                  placeholder="e.g., 1h 30m"
+                  placeholder="ej. 1h 30m"
                 />
                 <button className="btn btn-default" onClick={handleLogTime} disabled={saving}>Log</button>
                 <button className="btn" onClick={() => setEditing(null)}>Cancel</button>
@@ -364,12 +362,12 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
         </div>
 
         <div className="section">
-          <h3>Historial de Tiempos ({worklogs.length})</h3>
+          <h3>Worklog History ({worklogs.length})</h3>
           {worklogsLoading ? (
-            <div className="loading">Cargando worklogs...</div>
+            <div className="loading">Loading worklogs...</div>
           ) : worklogs.length > 0 ? (
             <div className="worklogs-history">
-              {worklogs
+              {[...worklogs]
                 .sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime())
                 .map((worklog) => (
                   <div key={worklog.id} className="worklog-history-item">
@@ -392,12 +390,12 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
                 ))}
             </div>
           ) : (
-            <div className="no-worklogs">No hay tiempos registrados aún</div>
+            <div className="no-worklogs">No time logged yet</div>
           )}
         </div>
 
         <div className="section">
-          <h3>Subtareas ({fields.subtasks?.length || 0})</h3>
+          <h3>Subtasks ({fields.subtasks?.length || 0})</h3>
 
           <div className="subtasks-create">
             {editing === 'createSubtask' ? (
@@ -406,16 +404,16 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
                   type="text"
                   value={newSubtaskSummary}
                   onChange={(e) => setNewSubtaskSummary(e.target.value)}
-                  placeholder="Nombre de la subtarea..."
+                  placeholder="Subtask name..."
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateSubtask()}
                 />
                 <button className="btn btn-default" onClick={handleCreateSubtask} disabled={saving || !newSubtaskSummary.trim()}>
-                  Crear
+                  Create
                 </button>
-                <button className="btn" onClick={() => setEditing(null)}>Cancelar</button>
+                <button className="btn" onClick={() => setEditing(null)}>Cancel</button>
               </div>
             ) : (
-              <button className="btn add-btn" onClick={() => setEditing('createSubtask')}>+ Nueva Subtarea</button>
+              <button className="btn add-btn" onClick={() => setEditing('createSubtask')}>+ New Subtask</button>
             )}
           </div>
 
@@ -426,7 +424,7 @@ export default function IssueDetailPanel({ issue, loading, onClose, onUpdate }: 
                   <img src={subtask.fields.issuetype?.iconUrl} alt="" className="type-icon" />
                   <span
                     className="subtask-key clickable"
-                    onClick={() => window.open(`https://tribal-mnc.atlassian.net/browse/${subtask.key}`, '_blank')}
+                    onClick={() => window.open(`https://tribal-mnc.atlassian.net/browse/${subtask.key}`, '_blank', 'noopener,noreferrer')}
                     title="Abrir en Jira"
                   >
                     {subtask.key}

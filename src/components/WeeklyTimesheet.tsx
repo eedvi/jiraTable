@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { readCache, writeCache } from '../lib/cache'
 
 interface Worklog {
   issueKey: string
@@ -100,14 +101,23 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
   const [data, setData] = useState<TimesheetData | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
+  const [adjusting, setAdjusting] = useState(false)
+  const [adjustMsg, setAdjustMsg] = useState<string | null>(null)
+  const [stale, setStale] = useState(false)
 
   const fetchTimesheet = async (isSilent: boolean = false) => {
     if (!isSilent) setLoading(true)
     try {
       const res = await fetch('/api/worklogs/daily')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const result = await res.json()
       setData(result)
+      setStale(false)
+      writeCache('daily', result)
     } catch (err) {
+      // Offline or API not up yet (cold-start proxy race): keep the cached week
+      // on screen, but say so instead of passing stale numbers off as current.
+      setStale(true)
       console.error('Error fetching timesheet:', err)
     } finally {
       if (!isSilent) setLoading(false)
@@ -115,7 +125,11 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
   }
 
   useEffect(() => {
-    fetchTimesheet()
+    // Paint last-known week instantly, then revalidate — survives the
+    // startup race where the client loads before the API binds to :3001.
+    const cached = readCache<TimesheetData>('daily')
+    if (cached) setData(cached)
+    fetchTimesheet(!!cached)
   }, [])
 
   useEffect(() => {
@@ -123,6 +137,22 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
       fetchTimesheet(silent ?? false)
     }
   }, [refreshKey])
+
+  const handleAdjustDates = async () => {
+    setAdjusting(true)
+    setAdjustMsg(null)
+    try {
+      const res = await fetch('/api/worklogs/adjust-dates', { method: 'POST' })
+      const result = await res.json()
+      const n = result.adjusted?.length || 0
+      setAdjustMsg(n > 0 ? `${n} date${n !== 1 ? 's' : ''} adjusted → ${result.adjustedDate}` : 'Up to date')
+      if (n > 0) fetchTimesheet(true)
+    } catch {
+      setAdjustMsg('Failed to adjust dates')
+    } finally {
+      setAdjusting(false)
+    }
+  }
 
   const getProgressColor = (progress: number): string => {
     if (progress >= 100) return 'success'
@@ -142,27 +172,21 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
 
   return (
     <div className="timesheet window">
-      <div className="title-bar">
-        <button aria-label="Close" className="close"></button>
-        <h1 className="title">Control Semanal</h1>
-        <button aria-label="Resize" className="resize"></button>
-      </div>
-      <div className="separator"></div>
-
-      <div className="window-pane timesheet-content">
-        {loading ? (
-          <div className="loading">Cargando...</div>
+      <div className={`window-pane timesheet-content ${loading && data ? 'is-refreshing' : ''}`} aria-busy={loading}>
+        {loading && !data ? (
+          <div className="loading">Loading...</div>
         ) : data ? (
           <>
             <div className="timesheet-header">
               <div className="week-info">
-                <span className="week-label">Semana:</span>
+                <span className="week-label">Week:</span>
                 <span className="week-dates">{formatDate(data.weekStart)} - {formatDate(data.weekEnd)}</span>
+                {stale && <span className="stale-pill" role="status">offline — cached</span>}
               </div>
               <div className="week-summary">
                 <div className="summary-item">
                   <span className="label">Total:</span>
-                  <span className="value">{data.totalHours}h / {data.weeklyGoalHours}h</span>
+                  <span className="value">{formatHours(data.totalSeconds)} / {data.weeklyGoalHours}h</span>
                 </div>
                 <div className="progress-bar">
                   <div
@@ -173,9 +197,18 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
                   </div>
                 </div>
               </div>
+              <button
+                className="btn adjust-dates-btn"
+                onClick={handleAdjustDates}
+                disabled={adjusting}
+                title="Align the due dates of tickets worked on this week to Friday"
+              >
+                {adjusting ? 'Adjusting…' : 'Adjust due dates'}
+              </button>
+              {adjustMsg && <div className="adjust-msg">{adjustMsg}</div>}
             </div>
 
-            <div className="daily-grid">
+            <div className="timesheet-grid">
               {data.dailyData.map((day) => {
                 const isExpanded = expandedDay === day.date
                 const today = isToday(day.date)
@@ -193,15 +226,15 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
                       <div className="day-info">
                         <span className="day-name">{day.dayName}</span>
                         <span className="day-date">{formatDate(day.date)}</span>
-                        {hasAnyConflict && <span className="conflict-badge" title="Hay conflictos de horario">!</span>}
+                        {hasAnyConflict && <span className="conflict-badge" title="Has scheduling conflicts">!</span>}
                       </div>
-                      {today && <span className="today-badge">HOY</span>}
+                      {today && <span className="today-badge">TODAY</span>}
                     </div>
 
                     <div className="day-progress">
                       <div className="hours-display">
                         <span className={`hours ${day.progress >= 100 ? 'complete' : ''}`}>
-                          {day.totalHours}h
+                          {formatHours(day.totalSeconds)}
                         </span>
                         <span className="goal">/ {day.goalHours}h</span>
                       </div>
@@ -226,7 +259,7 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
                         className="btn toggle-worklogs"
                         onClick={() => setExpandedDay(isExpanded ? null : day.date)}
                       >
-                        {isExpanded ? '−' : '+'} {day.worklogs.length} {day.worklogs.length === 1 ? 'registro' : 'registros'}
+                        {isExpanded ? '−' : '+'} {day.worklogs.length} {day.worklogs.length === 1 ? 'entry' : 'entries'}
                       </button>
                     )}
 
@@ -259,7 +292,7 @@ export default function WeeklyTimesheet({ refreshKey, silent }: WeeklyTimesheetP
             </div>
           </>
         ) : (
-          <div className="no-data">No hay datos disponibles</div>
+          <div className="no-data">No data available</div>
         )}
       </div>
     </div>
