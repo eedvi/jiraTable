@@ -1,0 +1,8 @@
+{
+  "$schema": "ticket-index",
+  "version": "1.0",
+  "project": "jiraTable",
+  "basePath": ".",
+  "tickets": {},
+  "pathIndex": {}
+}
