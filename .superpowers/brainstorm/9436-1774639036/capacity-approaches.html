@@ -1,0 +1,115 @@
+<h2>Capacity Banner — Design Approaches</h2>
+<p class="subtitle">A persistent banner showing your weekly occupation based on assigned ticket estimates</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Compact Progress Bar</h3>
+      <p>A single-line banner below the nav tabs. Shows a progress bar with "Estimated: 32h / 40h (80%)" plus color coding: green ≤80%, orange 80-100%, red >100%.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-header">Preview</div>
+        <div class="mockup-body" style="padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 12px; background: #1a1a2e; padding: 10px 16px; border-radius: 8px; color: #e0e0e0; font-size: 13px;">
+            <span style="font-weight: 600; white-space: nowrap;">Capacidad Semanal</span>
+            <div style="flex: 1; background: #2a2a4a; border-radius: 4px; height: 20px; overflow: hidden;">
+              <div style="width: 80%; height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">80%</div>
+            </div>
+            <span style="white-space: nowrap;">32h / 40h</span>
+            <span style="color: #4caf50; font-weight: 600;">● OK</span>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Minimal space — always visible</li><li>Instant read on load status</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>No per-ticket breakdown visible</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Expandable Banner</h3>
+      <p>Same compact bar as A, but clicking it expands to show a breakdown: each ticket with its estimate, status, and contribution to the total. Collapsible to stay out of the way.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-header">Preview — Expanded</div>
+        <div class="mockup-body" style="padding: 12px;">
+          <div style="background: #1a1a2e; border-radius: 8px; color: #e0e0e0; font-size: 13px; overflow: hidden;">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer;">
+              <span style="font-weight: 600; white-space: nowrap;">Capacidad Semanal ▼</span>
+              <div style="flex: 1; background: #2a2a4a; border-radius: 4px; height: 20px; overflow: hidden;">
+                <div style="width: 115%; max-width: 100%; height: 100%; background: linear-gradient(90deg, #ff9800, #f44336); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">115%</div>
+              </div>
+              <span style="white-space: nowrap;">46h / 40h</span>
+              <span style="color: #f44336; font-weight: 600;">● Sobrecarga</span>
+            </div>
+            <div style="border-top: 1px solid #2a2a4a; padding: 8px 16px;">
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #2a2a4a;">
+                <span style="color: #90caf9;">PROJ-123</span>
+                <span>API Integration</span>
+                <span style="color: #ff9800;">In Progress</span>
+                <span style="font-weight: 600;">16h</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #2a2a4a;">
+                <span style="color: #90caf9;">PROJ-456</span>
+                <span>Fix login bug</span>
+                <span style="color: #2196f3;">To Do</span>
+                <span style="font-weight: 600;">8h</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #2a2a4a;">
+                <span style="color: #90caf9;">PROJ-789</span>
+                <span>Update dashboard</span>
+                <span style="color: #ff9800;">In Progress</span>
+                <span style="font-weight: 600;">14h</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                <span style="color: #90caf9;">PROJ-101</span>
+                <span>Code review</span>
+                <span style="color: #2196f3;">To Do</span>
+                <span style="font-weight: 600;">8h</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Compact by default, detailed on demand</li><li>See which tickets are eating capacity</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Slightly more complex to build</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Dual Bar (Estimated vs Logged)</h3>
+      <p>Two stacked progress bars: one for estimated hours (from ticket estimates), one for logged hours (from worklogs). Shows both planned load and actual progress side by side.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-header">Preview</div>
+        <div class="mockup-body" style="padding: 12px;">
+          <div style="background: #1a1a2e; padding: 10px 16px; border-radius: 8px; color: #e0e0e0; font-size: 13px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+              <span style="font-weight: 600; width: 80px;">Estimado</span>
+              <div style="flex: 1; background: #2a2a4a; border-radius: 4px; height: 16px; overflow: hidden;">
+                <div style="width: 80%; height: 100%; background: linear-gradient(90deg, #42a5f5, #1e88e5); border-radius: 4px;"></div>
+              </div>
+              <span style="width: 80px; text-align: right;">32h / 40h</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-weight: 600; width: 80px;">Registrado</span>
+              <div style="flex: 1; background: #2a2a4a; border-radius: 4px; height: 16px; overflow: hidden;">
+                <div style="width: 50%; height: 100%; background: linear-gradient(90deg, #66bb6a, #43a047); border-radius: 4px;"></div>
+              </div>
+              <span style="width: 80px; text-align: right;">20h / 40h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h4>Pros</h4><ul><li>See planned vs actual at a glance</li><li>Spot if you're behind or ahead</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Takes more vertical space</li><li>Two bars may feel busy for a banner</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
